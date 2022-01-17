@@ -1,0 +1,49 @@
+#https://www.urbackup.org/administration_manual.html#x1-60002.1.2
+- hosts: active
+  become: yes
+  tasks:
+    - name: Install open-iscsi - Datastore
+      apt:
+       name: open-iscsi
+       state: present
+       update_cache: true
+
+    - name: "Create startup service script - iSCSI"
+      copy:
+        dest: /etc/urbackup/startup.sh
+        mode: u=rwx,g=rx,o=r
+        owner: root
+        content: |
+            iscsiadm --mode node --targetname {{ backup_storage_iscsi_iqn }} --portal {{ backup_storage_iscsi_server }} --login
+            mount -o "noatime" {{ backup_storage_iscsi_dev }} /media/BACKUP/urbackup/
+            service urbackupsrv start
+      when: storage_iscsi == 'yes'
+
+    - name: "Create startup service script - no iSCSI"
+      copy:
+        dest: /etc/urbackup/startup.sh
+        mode: u=rwx,g=rx,o=r
+        owner: root
+        content: |
+            mount -o "noatime" {{ backup_storage_iscsi_dev }} /media/BACKUP/urbackup/
+            service urbackupsrv start
+      when: storage_iscsi != 'yes'
+
+    - name: "Configure startup service"
+      copy:
+        dest: /etc/systemd/system/urbackup-mc.service
+        mode: u=rw,g=r,o=r
+        owner: root
+        content: |
+            [Unit]
+            After=urbackup-mc.service
+            [Service]
+            ExecStart=/etc/urbackup/startup.sh
+            [Install]
+            WantedBy=default.target
+    
+    - name: Enable urbackup-mc
+      systemd:
+        name: urbackup-mc.service
+        daemon_reload: yes
+        enabled: yes

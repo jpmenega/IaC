@@ -1,0 +1,4 @@
+https://www.zabbix.com/br/integrations/postgresql
+
+CREATE USER zbx_monitor WITH PASSWORD '<PASSWORD>' INHERIT;
+GRANT pg_monitor TO zbx_monitor;

@@ -1,0 +1,147 @@
+- hosts: active
+  become: yes
+  tasks:
+#    - name: create the 'ubuntu' user
+#      user: name=ubuntu append=yes state=present createhome=yes shell=/bin/bash
+
+#    - name: allow 'ubuntu' to have passwordless sudo
+#      lineinfile:
+#        dest: /etc/sudoers
+#        line: 'ubuntu ALL=(ALL) NOPASSWD: ALL'
+#        validate: 'visudo -cf %s'
+
+#    - name: set up authorized keys for the ubuntu user
+#      authorized_key: user=ubuntu key="{{item}}"
+#      with_file:
+#        - ~/.ssh/id_rsa.pub
+
+    - name: Stop multipathd
+      service:
+        name: multipathd.service
+        state: stopped
+      when: ansible_distribution == 'Ubuntu'
+
+    - name: Disable service multipathd
+      service:
+        name: multipathd.service
+        enabled: no
+      when: ansible_distribution == 'Ubuntu'
+
+    - name: Set timezone to UTC
+      when: ansible_date_time.tz != 'America/Sao_Paulo'
+      command: timedatectl set-timezone America/Sao_Paulo
+
+    - name: "Build hosts file"
+      lineinfile: dest=/etc/hosts regexp='.*{{ item }}$' line="{{ hostvars[item].ansible_host }} {{item}}.{{ domain_name }} {{item}}" state=present
+      when: hostvars[item].ansible_host is defined
+      with_items: "{{ groups['all'] }}"
+
+    - name: Download Zabbix deb release
+      get_url: 
+        url="{{ zabbix_agent_package_url }}"
+        dest="/root/{{ zabbix_agent_package_name }}"
+        validate_certs=no
+      with_items: "{{ zabbix_agent_package_name | default([]) }}"
+
+    - name: Install Zabbix Agent package
+      apt: deb="/root/{{ zabbix_agent_package_name }}"
+      with_items: "{{ zabbix_agent_package_name | default([]) }}"
+
+    - name: "Install zabbix-agent"
+      apt:
+       name: zabbix-agent
+       state: present
+       update_cache: true
+
+    - name: "Configure Zabbix Agent"
+      copy:
+        dest: /etc/zabbix/zabbix_agentd.conf
+        mode: u=rw,g=r,o=r
+        owner: zabbix
+        content: |
+            PidFile=/run/zabbix/zabbix_agentd.pid
+            LogFile=/var/log/zabbix/zabbix_agentd.log
+            LogFileSize=0
+            Server={{ zabbix_server_address }}
+            ServerActive=127.0.0.1
+            Include=/etc/zabbix/zabbix_agentd.d/*.conf
+            Hostname={{ ansible_hostname }}
+            AllowKey=system.run[*]
+            Timeout=30
+
+    - name: Creates Zabbix conf directory if not exist
+      file:
+        path: /etc/zabbix/zabbix_agentd.d
+        state: directory
+
+    #- name: gluster-monitoring.pl
+    #  shell: "wget {{ git_source }}/main/zabbix-agent/gluster-monitoring.pl"
+    #  args:
+    #    chdir: /etc/zabbix
+    #    creates: gluster-monitoring.pl
+    #  when: gluster == "yes"
+    #  with_items: "{{ gluster | default([]) }}"
+
+    #- name: "gluster-monitoring.pl permission"
+    #  file:
+    #    path: /etc/zabbix/gluster-monitoring.pl
+    #    state: touch
+    #    mode: u=rwx,g=rx,o=rx
+    #  when: gluster == "yes"
+    #  with_items: "{{ gluster | default([]) }}"
+
+    #- name: gluster.conf
+    #  shell: "wget {{ git_source }}/main/zabbix-agent/gluster.conf"
+    #  args:
+    #    chdir: /etc/zabbix/zabbix_agentd.d
+    #    creates: gluster.conf
+    #  when: gluster == "yes"
+    #  with_items: "{{ gluster | default([]) }}"
+
+    - name: userparameter_drbd.conf
+      get_url:
+        url: "{{ git_source }}/main/zabbix-agent/userparameter_drbd.conf"
+        dest: /etc/zabbix/zabbix_agentd.d
+
+    - name: "Install sudo"
+      apt:
+       name: sudo
+       state: present
+       update_cache: true
+
+    - name: zabbix sudoer
+      get_url:
+        url: "{{ git_source }}/main/zabbix-agent/zabbix"
+        dest: /etc/sudoers.d/
+
+    - name: "Install libswitch-perl"
+      apt:
+       name: libswitch-perl
+       state: present
+       update_cache: true
+      when: gluster == "yes"
+      with_items: "{{ gluster | default([]) }}"
+
+    - name: Restart zabbix-agent
+      service:
+        name: zabbix-agent.service
+        state: restarted
+
+    - name: install rsync
+      apt:
+        name: rsync
+        state: present
+        update_cache: true
+      when: ansible_distribution == 'Debian'
+
+    - name: install sysstat
+      apt:
+        name: sysstat
+        state: present
+        update_cache: true
+
+    - name: install inetutils-traceroute
+      apt:
+        name: inetutils-traceroute
+        state: present
+        update_cache: false

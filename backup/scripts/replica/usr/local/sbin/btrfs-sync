@@ -1,0 +1,349 @@
+#!/bin/bash
+
+#
+# Simple script that synchronizes BTRFS snapshots locally or through SSH.
+# Features compression, retention policy and automatic incremental sync
+#
+# Usage:
+#  btrfs-sync [options] <src> [<src>...] [[user@]host:]<dir>
+#
+#  -k|--keep NUM     keep only last <NUM> sync'ed snapshots
+#  -d|--delete       delete snapshots in <dst> that don't exist in <src>
+#  -z|--xz           use xz     compression. Saves bandwidth, but uses one CPU
+#  -Z|--pbzip2       use pbzip2 compression. Saves bandwidth, but uses all CPUs
+#  -q|--quiet        don't display progress
+#  -v|--verbose      display more information
+#  -h|--help         show usage
+#
+# <src> can either be a single snapshot, or a folder containing snapshots
+# <user> requires privileged permissions at <host> for the 'btrfs' command
+#
+# Cron example: daily synchronization over the internet, keep only last 50
+#
+# cat > /etc/cron.daily/btrfs-sync <<EOF
+# #!/bin/bash
+# /usr/local/sbin/btrfs-sync -q -k50 -z /home user@host:/path/to/snaps
+# EOF
+# chmod +x /etc/cron.daily/btrfs-sync
+#
+# Copyleft 2018 by Ignacio Nunez Hernanz <nacho _a_t_ ownyourbits _d_o_t_ com>
+# GPL licensed (see end of file) * Use at your own risk!
+#
+# More at https://ownyourbits.com
+#
+
+set -e -o pipefail
+
+# help
+print_usage() {
+  echo "Usage:
+  $BIN [options] [[user@]host:]<src> [<src>...] [[user@]host:]<dir>
+
+  -k|--keep NUM     keep only last <NUM> sync'ed snapshots
+  -d|--delete       delete snapshots in <dst> that don't exist in <src>
+  -z|--xz           use xz     compression. Saves bandwidth, but uses one CPU
+  -Z|--pbzip2       use pbzip2 compression. Saves bandwidth, but uses all CPUs
+  -p|--port         SSH port. Default 22
+  -q|--quiet        don't display progress
+  -v|--verbose      display more information
+  -h|--help         show usage
+
+<src> can either be a single snapshot, or a folder containing snapshots
+<user> requires privileged permissions at <host> for the 'btrfs' command
+
+Cron example: daily synchronization over the internet, keep only last 50
+
+cat > /etc/cron.daily/btrfs-sync <<EOF
+#!/bin/bash
+/usr/local/sbin/btrfs-sync -q -k50 -z /home user@host:/path/to/snaps
+EOF
+chmod +x /etc/cron.daily/btrfs-sync
+"
+}
+
+echov() { if [[ "$VERBOSE" == 1 ]]; then echo "$@"; fi }
+
+#----------------------------------------------------------------------------------------------------------
+
+# preliminary checks
+BIN="${0##*/}"
+[[ $# -lt 2      ]] && { print_usage                                ; exit 1; }
+[[ ${EUID} -ne 0 ]] && { echo "Must be run as root. Try 'sudo $BIN'"; exit 1; }
+
+# parse arguments
+KEEP=0
+PORT=22
+ZIP=cat PIZ=cat
+SILENT=">/dev/null"
+
+OPTS=$( getopt -o hqzZk:p:dv -l quiet -l help -l xz -l pbzip2 -l keep: -l port: -l delete -l verbose -- "$@" 2>/dev/null )
+[[ $? -ne 0 ]] && { echo "error parsing arguments"; exit 1; }
+eval set -- "$OPTS"
+
+while true; do
+  case "$1" in
+    -h|--help   ) print_usage; exit  0 ;;
+    -q|--quiet  ) QUIET=1    ; shift 1 ;;
+    -d|--delete ) DELETE=1   ; shift 1 ;;
+    -k|--keep   ) KEEP=$2    ; shift 2 ;;
+    -p|--port   ) PORT=$2    ; shift 2 ;;
+    -z|--xz     ) ZIP=xz     PIZ=( xz     -d ); shift 1 ;;
+    -Z|--pbzip2 ) ZIP=pbzip2 PIZ=( pbzip2 -d ); shift 1 ;;
+    -v|--verbose) SILENT=""  VERBOSE=1        ; shift 1 ;;
+    --)                shift;  break   ;;
+  esac
+done
+
+SRC=( "${@:1:$#-1}" )
+DST="${@: -1}"
+
+# detect remote src argument
+[[ "$SRC" =~ : ]] && {
+  NET_SRC="$( sed 's|:.*||' <<<"$SRC" )"
+  SRC="$( sed 's|.*:||' <<<"$SRC" )"
+  SSH_SRC=( ssh -p "$PORT" -o ServerAliveInterval=60 -o ConnectTimeout=10 -o BatchMode=yes "$NET_SRC" )
+}
+
+[[ "$SSH_SRC" != "" ]] && SRC_CMD=( ${SSH_SRC[@]} ) || SRC_CMD=( eval )
+${SRC_CMD[@]} test -x "'$SRC'" &>/dev/null || {
+  [[ "$SSH_SRC" != "" ]] && echo "SSH access error to $NET_SRC. Do you have passwordless login setup, and adequate permissions for $SRC?"
+  [[ "$SSH_SRC" == "" ]] && echo "Access error. Do you have adequate permissions for $SRC?"
+  exit 1
+}
+
+# detect remote dst argument
+[[ "$DST" =~ : ]] && {
+  NET="$( sed 's|:.*||' <<<"$DST" )"
+  DST="$( sed 's|.*:||' <<<"$DST" )"
+  SSH=( ssh -p "$PORT" -o ServerAliveInterval=5 -o ConnectTimeout=1 -o BatchMode=yes "$NET" )
+}
+[[ "$SSH" != "" ]] && DST_CMD=( ${SSH[@]} ) || DST_CMD=( eval )
+${DST_CMD[@]} test -x "'$DST'" &>/dev/null || {
+  [[ "$SSH" != "" ]] && echo "SSH access error to $NET. Do you have passwordless login setup, and adequate permissions for $DST?"
+  [[ "$SSH" == "" ]] && echo "Access error. Do you have adequate permissions for $DST?"
+  exit 1
+}
+
+#----------------------------------------------------------------------------------------------------------
+
+# more checks
+
+## don't overlap
+pgrep -F  /run/btrfs-sync.pid  &>/dev/null && { echo "$BIN is already running"; exit 1; }
+echo $$ > /run/btrfs-sync.pid
+
+${DST_CMD[@]} "pgrep -f btrfs\ receive &>/dev/null" && { echo "btrfs-sync already running at destination"; exit 1; }
+
+## src checks
+echov "* Check source"
+while read entry; do SRCS+=( "$entry" ); done < <(
+  "${SRC_CMD[@]}" "
+    for s in "${SRC[@]}"; do
+      src=\"\$(cd \"\$s\" &>/dev/null && pwd)\" || { echo \"\$s not found\"; exit 1; } #abspath
+      btrfs subvolume show \"\$src\" &>/dev/null && echo \"0|\$src\" || \
+      for dir in \$( ls -drt \"\$src\"/* 2>/dev/null ); do
+        DATE=\"\$( btrfs su sh \"\$dir\" 2>/dev/null | grep \"Creation time:\" | awk '{ print \$3, \$4 }' )\" \
+        || continue   # not a subvolume
+        SECS=\$( date -d \"\$DATE\" +\"%s\" )
+        echo \"\$SECS|\$dir\"
+      done
+    done | sort -V | sed 's=.*|=='
+  "
+)
+[[ ${#SRCS[@]} -eq 0 ]] && { echo "no BTRFS subvolumes found"; exit 1; }
+
+## check pbzip2
+[[ "$ZIP" == "pbzip2" ]] && {
+    "${SRC_CMD[@]}" type pbzip2 &>/dev/null && \
+    "${DST_CMD[@]}" type pbzip2 &>/dev/null || {
+      echo "INFO: 'pbzip2' not installed on both ends, fallback to 'xz'"
+      ZIP=xz PIZ=unxz
+  }
+}
+
+## use 'pv' command if available
+PV=( pv -F"time elapsed [%t] | rate %r | total size [%b]" )
+[[ "$QUIET" == "1" ]] && PV=( cat ) || type pv &>/dev/null || {
+  echo "INFO: install the 'pv' package in order to get a progress indicator"
+  PV=( cat )
+}
+
+#----------------------------------------------------------------------------------------------------------
+
+# sync snapshots
+
+get_dst_snapshots() {      # sets DSTS DST_UUIDS
+  local DST="$1"
+  unset DSTS DST_UUIDS
+  while read entry; do
+    DST_UUIDS+=( "$( sed 's=|.*==' <<<"$entry" )" )
+    DSTS+=(      "$( sed 's=.*|==' <<<"$entry" )" )
+  done < <(
+    "${DST_CMD[@]}" "
+      DSTS=( \$( ls -d \"$DST\"/* 2>/dev/null ) )
+      for dst in \${DSTS[@]}; do
+        UUID=\$( sudo btrfs su sh \"\$dst\" 2>/dev/null | grep 'Received UUID' | awk '{ print \$3 }' )
+        [[ \"\$UUID\" == \"-\" ]] || [[ \"\$UUID\" == \"\" ]] && continue
+        echo \"\$UUID|\$dst\"
+      done"
+  )
+}
+
+choose_seed() {      # sets SEED
+  local SRC="$1"
+
+  SEED="$SEED_NEXT"
+  if [[ "$SEED" == "" ]]; then
+    # try to get most recent src snapshot that exists in dst to use as a seed
+    local RXID_CALCULATED=0
+    declare -A PATH_RXID DATE_RXID SHOWP RXIDP DATEP
+    #local LIST="$( "${SRC_CMD[@]}" sudo btrfs subvolume list -su "$SRC" )"
+    #JP
+    local LIST="$( "${SRC_CMD[@]}" sudo btrfs subvolume list -u "$SRC" )"
+
+    SEED=$(
+      for id in "${DST_UUIDS[@]}"; do
+        # try to match by UUID
+        #local PATH_=$( awk "{ if ( \$14 == \"$id\" ) print \$16       }" <<<"$LIST" )
+        #local DATE=$(  awk "{ if ( \$14 == \"$id\" ) print \$11, \$12 }" <<<"$LIST" )
+        #JP
+        local PATH_=$( awk "{ if ( \$9 == \"$id\" ) print \$11       }" <<<"$LIST" )
+        local DATE
+
+        # try to match by received UUID, only if necessary
+        [[ "$PATH_" == "" ]] && {
+          [[ "$RXID_CALCULATED" == "0" ]] && { # create table during the first iteration if needed
+            local PATHS=( $( "${SRC_CMD[@]}" sudo btrfs su list -u "$SRC" | awk '{ print $11 }' ) )
+            for p in "${PATHS[@]}"; do
+              SHOWP="$( "${SRC_CMD[@]}" sudo btrfs su sh "$( dirname "$SRC" )/$( basename "$p" )" 2>/dev/null )"
+              RXIDP="$( grep 'Received UUID' <<<"$SHOWP" | awk '{ print $3     }' )"
+              DATEP="$( grep 'Creation time' <<<"$SHOWP" | awk '{ print $3, $4 }' )"
+              [[ "$RXIDP" == "" ]] && continue
+              PATH_RXID["$RXIDP"]="$p"
+              DATE_RXID["$RXIDP"]="$DATEP"
+            done
+            RXID_CALCULATED=1
+          }
+          PATH_="${PATH_RXID["$id"]}"
+           DATE="${DATE_RXID["$id"]}"
+        }
+
+        [[ "$PATH_" == "" ]] || [[ "$PATH_" == "$( basename "$SRC" )" ]] && continue
+
+        local SECS=$( date -d "$DATE" +"%s" )
+        echo "$SECS|$PATH_"
+      done | sort -V | tail -1 | cut -f2 -d'|'
+    )
+  fi
+}
+
+exists_at_dst() {
+  local SHOW="$( "${SRC_CMD[@]}" sudo btrfs subvolume show "$SRC" )"
+
+  local SRC_UUID="$( grep 'UUID:' <<<"$SHOW" | head -1 | awk '{ print $2 }' )"
+  grep -q "$SRC_UUID" <<<"${DST_UUIDS[@]}" && return 0;
+
+  local SRC_RXID="$( grep 'Received UUID' <<<"$SHOW"   | awk '{ print $3 }' )"
+  grep -q "^-$"       <<<"$SRC_RXID"       && return 1;
+  grep -q "$SRC_RXID" <<<"${DST_UUIDS[@]}" && return 0;
+
+  return 1
+}
+
+## sync incrementally
+sync_snapshot() {
+  local SRC="$1"
+  "${SRC_CMD[@]}" test -d "'$SRC'" || return
+
+  exists_at_dst "$SRC" && { echov "* Skip existing '$SRC'"; return 0; }
+
+  choose_seed "$SRC"  # sets SEED
+
+  # incremental sync argument
+  [[ "$SEED" != "" ]] && {
+    local SEED_PATH="$( dirname "$SRC" )/$( basename $SEED )"
+    "${SRC_CMD[@]}" test -d "'$SEED_PATH'" &&
+      local SEED_ARG=( -p "$SEED_PATH" ) || \
+      echo "INFO: couldn't find $SEED_PATH. Non-incremental mode"
+  }
+
+  # do it
+  echo -n "* Synchronizing '$src'"
+  [[ "$SEED_ARG" != "" ]] && echov -n " using seed '$SEED'"
+  echo "..."
+
+  "${SRC_CMD[@]}" \
+  sudo btrfs send -q ${SEED_ARG[@]} "$SRC" \
+    | "$ZIP" \
+    | "${PV[@]}" \
+    | "${DST_CMD[@]}" "${PIZ[@]} | sudo btrfs receive \"$DST\" 2>&1 |(grep -v -e'^At subvol ' -e'^At snapshot '||true)" \
+    || {
+      "${DST_CMD[@]}" sudo btrfs subvolume delete "$DST"/"$( basename "$SRC" )" 2>/dev/null
+      return 1;
+    }
+
+  # update DST list
+  DSTS+=("$DST/$( basename "$SRC" )")
+  DST_UUIDS+=("$SRC_UUID")
+  SEED_NEXT="$SRC"
+}
+
+#----------------------------------------------------------------------------------------------------------
+
+# sync all snapshots found in src
+echov "* Check destination"
+get_dst_snapshots "$DST" # sets DSTS DST_UUIDS
+for src in "${SRCS[@]}"; do
+  #JP
+  if [[ ${src##*/} != "current" ]]; then
+    sync_snapshot "$src" && RET=0 || RET=1
+    for i in $(seq 1 2); do
+      [[ "$RET" != "1" ]] && break
+      echo "* Retrying '$src'..."
+      sync_snapshot "$src" && RET=0 || RET=1
+    done
+    [[ "$RET" == "1" ]] && { echo "Abort"; exit 1; }
+  fi
+done
+
+#----------------------------------------------------------------------------------------------------------
+
+# retention policy
+[[ "$KEEP" != 0 ]] && \
+  [[ ${#DSTS[@]} -gt $KEEP ]] && \
+  echov "* Pruning old snapshots..." && \
+  for (( i=0; i < $(( ${#DSTS[@]} - KEEP )); i++ )); do
+    PRUNE_LIST+=( "${DSTS[$i]}" )
+  done && \
+  ${DST_CMD[@]} sudo btrfs subvolume delete "${PRUNE_LIST[@]}" $SILENT
+
+# delete flag
+[[ "$DELETE" == 1 ]] && \
+  for dst in "${DSTS[@]}"; do
+    FOUND=0
+    for src in "${SRCS[@]}"; do
+      [[ "$( basename $src )" == "$( basename $dst )" ]] && { FOUND=1; break; }
+    done
+    [[ "$FOUND" == 0 ]] && DEL_LIST+=( "$dst" )
+  done
+[[ "$DEL_LIST" != "" ]] && \
+  echov "* Deleting non existent snapshots..." && \
+  ${DST_CMD[@]} sudo btrfs subvolume delete "${DEL_LIST[@]}" $SILENT
+
+exit 0
+
+# License
+#
+# This script is free software; you can redistribute it and/or modify it
+# under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This script is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this script; if not, write to the
+# Free Software Foundation, Inc., 59 Temple Place, Suite 330,

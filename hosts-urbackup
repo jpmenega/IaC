@@ -1,0 +1,24 @@
+[active]
+urbackup01 ansible_host=192.168.1.245 ansible_user=root lb_primary=yes storage_iscsi=yes
+
+[on_hold]
+
+[all:vars]
+ansible_python_interpreter=/usr/bin/python3
+domain_name=medlav.intranet
+#zabbix_agent_package_url=https://repo.zabbix.com/zabbix/5.2/ubuntu/pool/main/z/zabbix-release/zabbix-release_5.2-1%2Bubuntu20.04_all.deb
+#zabbix_agent_package_name=zabbix-release_5.2-1+ubuntu20.04_all.deb
+zabbix_agent_package_url=https://repo.zabbix.com/zabbix/5.4/debian/pool/main/z/zabbix-release/zabbix-release_5.4-1%2Bdebian11_all.deb
+zabbix_agent_package_name=zabbix-release_5.4-1%2Bdebian11_all.deb
+zabbix_server_address=192.168.1.0/24
+git_source=https://raw.githubusercontent.com/jpmenega/docker-infra/main
+master_node_delegate=urbackup01
+#backup_storage_share=192.168.20.11:/Volume1
+#backup_storage_mount_options="nfs     defaults        0       0"
+#backup_storage_share=//192.168.15.10/urbackup
+#backup_storage_mount_options="cifs user=urbackup,pass=URB@ckup,,uid=?,gid=? 0 0"
+backup_storage_iscsi_server=192.168.1.2
+backup_storage_iscsi_iqn=iqn.2004-04.com.qnap:ts-231p:iscsi.nas.0a68db
+backup_storage_iscsi_dev=/dev/sda1
+backup_monitor_user=zabbix
+backup_monitor_password=pED4zKs2GNnmtWGM

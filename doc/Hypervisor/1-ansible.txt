@@ -1,0 +1,13 @@
+============================
+Source script server pre req
+apt install ansible
+ssh-keygen
+ssh-copy-id root@<node_ip>
+============================
+Source script server
+mkdir ~/docker-cluster
+cd ~/docker-cluster
+
+nano hosts-hypervisors (alterar IPs)
+
+ansible-playbook -i hosts-hypervisors main/initial.yml

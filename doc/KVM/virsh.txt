@@ -1,0 +1,53 @@
+#osinfo-query os (to list os-variants)
+(generic26 / debian10)
+#virt-install --virt-type=kvm --name samba-ad-dc02 --ram 4096 --vcpus=2 --os-variant=generic26 --cdrom=/var/lib/libvirt/boot/ubuntu-20.04.1-live-server-amd64.iso --network=bridge=br0,model=virtio --graphic vnc --disk path=/var/lib/libvirt/images/samba-ad-dc02.qcow2,size=20,bus=virtio,format=qcow2 --disk path=/var/lib/libvirt/images/samba-ad-dc02-glusterfs.qcow2,size=1024,bus=virtio,format=qcow2 --disk path=/var/lib/libvirt/images/samba-ad-dc02-glusterfs-shares.qcow2,size=1024,bus=virtio,format=qcow2 --prompt
+#virt-install --virt-type=kvm --name samba-ad-dc01 --ram 4096 --vcpus=2 --os-variant=debian10 --cdrom=/root/ISO/debian-10.9.0-amd64-netinst.iso --network=bridge=br0,model=virtio --graphic vnc --disk path=/var/lib/libvirt/images/samba-ad-dc01.qcow2,size=20,bus=virtio,format=qcow2 --disk path=/var/lib/libvirt/images/samba-ad-dc01-glusterfs-samba.qcow2,size=50,bus=virtio,format=qcow2 --disk path=/var/lib/libvirt/images/samba-ad-dc01-glusterfs-shares.qcow2,size=1024,bus=virtio,format=qcow2 --check disk_size=off
+#virt-install --virt-type=kvm --name firebird01 --ram 1024 --vcpus=2 --os-variant=generic26 --cdrom=/root/ISO/debian-10.9.0-amd64-netinst.iso --network=bridge=br0,model=virtio --graphic vnc --disk path=/var/lib/libvirt/images/firebird01.qcow2,size=10,bus=virtio,format=qcow2 --disk path=/var/lib/libvirt/images/firebird01-drbd.qcow2,size=30,bus=virtio,format=qcow2
+
+Floppy example
+#virt-install --virt-type=kvm --name jump-windows --ram 2048 --vcpus=2 --os-variant=win7 --cdrom=/var/lib/libvirt/boot/windows7.iso --disk path=/var/lib/libvirt/boot/virtio-win-drivers-20120712-1.vfd,device=floppy --network=bridge=br0,model=virtio --graphic vnc --disk path=/var/lib/libvirt/images/jump-windows.qcow2,size=20,bus=virtio,format=qcow2 
+
+#ssh root@192.168.1.201 -L 5900:127.0.0.1:5900
+
+VNC localhost 5900
+
+-----------------
+
+virsh undefine <Domain_VM_Name> --remove-all-storage
+
+Console #virsh console workernode02
+VNC     #ssh root@192.168.1.201 -L 5900:127.0.0.1:5900
+
+#virsh vncdisplay <Domain_VM_Name>
+
+-----------------
+RAW DISK
+<disk type='block' device='disk'>
+      <driver name='qemu' type='raw' cache='none'/>
+      <source dev='/dev/sdb'/>
+      <target dev='vdb' bus='virtio'/>
+</disk>
+
+------------------
+
+Create an attach new disk
+#qemu-img create {-o preallocation=full} -f qcow2 /var/lib/libvirt/images/samba-ad-dc02-glusterfs-shares.qcow2 1T
+#qemu-img create -o preallocation=full -f qcow2 /var/lib/libvirt/images/samba-ad-dc02-drbd-shares-1.qcow2 100G
+#virsh edit <domain>
+#or
+#virsh attach-disk ubuntu-masternode03 \
+--source /var/lib/libvirt/images/ubuntu-workernode03-glusterfs-samba.qcow2 \
+--target vdc \
+--cache none \
+--type qcow2 \
+--persistent
+
+
+Attach ISO as CDROM if needed
+#virsh attach-disk <Domain_VM_Name> /var/lib/libvirt/boot/alpine-virt-3.12.3-x86_64.iso hdc --type cdrom
+#virsh detach-disk <Domain_VM_Name> /var/lib/libvirt/boot/alpine-virt-3.12.3-x86_64.iso
+
+Verificar NICs de uma VM
+# virsh domiflist ipfire02
+Adicionar NIC na VM
+# virsh attach-interface --domain ipfire02 --type bridge --source br0 --model virtio --config

@@ -1,0 +1,26 @@
+#!/bin/bash
+
+LOG_FILE=/var/log/backup.log
+DEST_DIR=/tmp/backupzabbix
+
+cd /tmp
+
+echo "$(date) Backup MySQL (MariaDB) databases - pre tasks" > $LOG_FILE
+rm -r -f $DEST_DIR
+mkdir -p $DEST_DIR
+chmod 777 $DEST_DIR
+
+echo "$(date) Zabbix version evidence" >> $LOG_FILE
+/usr/sbin/zabbix_server -V > $DEST_DIR/zabbix-version.txt
+[ $? -eq 0 ]  || exit 1
+
+echo "$(date) Backup of zabbix" >> $LOG_FILE
+/usr/bin/mysqldump -u root zabbix | gzip > $DEST_DIR/zabbix.sql.gz
+[ $? -eq 0 ]  || exit 1
+
+echo "$(date) Backup of mysql" >> $LOG_FILE
+/usr/bin/mysqldump -u root mysql | gzip > $DEST_DIR/mysql.sql.gz
+[ $? -eq 0 ]  || exit 1
+
+echo "$(date) Backup pre tasks done." >> $LOG_FILE
+exit 0

@@ -1,0 +1,11 @@
+- hosts: all
+  become: yes
+  tasks:
+    - name: Create a default postgres password
+      shell: "sudo -u postgres psql -c \"alter user postgres password 'postgres';\" > postgresql-default-password.txt"
+      args:
+        chdir: $HOME
+        creates: postgresql-default-password.txt
+      when: lb_primary == "yes"
+      with_items: "{{ (lb_primary | default([])) }}"
+

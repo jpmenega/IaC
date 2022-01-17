@@ -1,0 +1,38 @@
+============================
+Source script server pre req
+apt install ansible
+ssh-keygen
+ssh-copy-id root@<node_ip>
+============================
+Source script server
+mkdir ~/docker-cluster
+cd ~/docker-cluster
+
+nano ~/docker-cluster/hosts-zabbix (alterar IPs)
+
+ansible-playbook -i hosts-zabbix main/initial.yml
+#ansible-playbook -i hosts-zabbix docker/docker.yml
+
+#ansible-playbook -i hosts-zabbix gluster/glusterfs.yml
+ansible-playbook -i hosts-zabbix lb/loadbalancer.yml
+ansible-playbook -i hosts-zabbix zabbix/zabbix.yml
+
+--------------------
+Know issues:
+zabbix nao consegue enviar msg para Slack: Precisa alterar o dominio do script da media de slack.com para slack.com. (isso ocorre por conta do ndots:5 inserido nos resolv.conf)
+-------------------
+
+
+BACKUP (precisa parar o cluster/banco pq o script vai subir o DRDB para copiar os arquivos)
+-cria servidor na console do UrBackup (Internet client/client behind NAT)
+-copia URL/script para instalacao (ainda nao instala)
+TF=`mktemp` && wget "http://10.214.157.23:55414/x?a=download_client&lang=en&clientid=1&authkey=irXaApwGXv&os=linux" -O $TF && sudo sh $TF; rm -f $TF
+-configura o schedule file backup (/tmp/backupzabbix) etc na console
+-instala o client e para o servico
+service urbackupclientbackend stop
+
+ansible-playbook -i hosts-zabbix zabbix/backup-client.yml
+
+#Enable MySQL backup
+https://www.urbackup.org/backup_mysql.html
+(Dump) On Linux with the binary client: Change 0 to 1 in /usr/local/etc/urbackup/mariadbdump.conf. Afterwards file backups will include the dump file of the database at urbackup_backup_scripts/mariadbdump.sql.

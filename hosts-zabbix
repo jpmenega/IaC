@@ -1,0 +1,29 @@
+[active]
+zabbix02 ansible_host=192.168.1.185 ansible_user=root lb_primary=yes nodePeer=192.168.1.184 device_id=host02
+
+[on_hold]
+zabbix01 ansible_host=192.168.1.184 ansible_user=root lb_slave=yes nodePeer=192.168.1.185 device_id=host01
+
+[all:vars]
+ansible_python_interpreter=/usr/bin/python3
+domain_name=crc.intranet
+name_server=192.168.1.2
+#zabbix_agent_package_url=https://repo.zabbix.com/zabbix/5.2/debian/pool/main/z/zabbix-release/zabbix-release_5.2-1%2Bdebian10_all.deb
+#zabbix_agent_package_name=zabbix-release_5.2-1%2Bdebian10_all.deb
+zabbix_agent_package_url=https://repo.zabbix.com/zabbix/5.4/debian/pool/main/z/zabbix-release/zabbix-release_5.4-1%2Bdebian11_all.deb
+zabbix_agent_package_name=zabbix-release_5.4-1%2Bdebian11_all.deb
+#zabbix_agent_package_url=https://repo.zabbix.com/zabbix/5.2/ubuntu/pool/main/z/zabbix-release/zabbix-release_5.2-1%2Bubuntu20.04_all.deb
+#zabbix_agent_package_name=zabbix-release_5.2-1+ubuntu20.04_all.deb
+zabbix_server_address=192.168.1.0/24
+git_source=https://raw.githubusercontent.com/jpmenega/docker-infra/main
+master_node_delegate=zabbix02
+cluster_vip_ip=192.168.1.182
+cluster_vip_nic=eth0
+cluster_vip_netmask=24
+mysql_vip_ip=192.168.1.183
+mysql_vip_nic=eth0
+mysql_vip_netmask=24
+mysql_zabbix_password=zabbix_pwd
+cluster_name=zabbix
+check_isolation_ip=208.67.220.222
+drbd_zabbix_volume=drbd0

@@ -1,0 +1,13 @@
+https://www.linuxuprising.com/2018/08/how-to-use-swap-file-instead-of-swap.html
+
+swapon -s
+swapoff /dev/dm-1
+nano /etc/fstab (remove swap partition from fstab)
+dd if=/dev/zero of=/swapfile bs=1024 count=1048576 (1GB)
+dd if=/dev/zero of=/swapfile bs=1024 count=16777216 (16GB)
+chmod 600 /swapfile
+mkswap /swapfile
+swapon /swapfile
+swapon -s
+nano /etc/fstab
+    /swapfile none  swap    sw      0       0

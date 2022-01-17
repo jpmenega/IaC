@@ -1,0 +1,72 @@
+- hosts: active
+  become: yes
+  tasks:
+   - name: install software-properties-common
+     apt:
+       name: software-properties-common
+       state: present
+       update_cache: true
+     when: gluster == "yes"
+     with_items: "{{ gluster | default([]) }}"
+
+   - name: Add Gluster repository from PPA
+     apt_repository:
+       repo: 'ppa:gluster/glusterfs-9'
+       state: present
+     when: gluster == "yes" and ansible_distribution == 'Ubuntu'
+     with_items: "{{ gluster | default([]) }}"
+
+   - name: install gnupg2
+     apt:
+        name: gnupg2
+        state: present
+        update_cache: true
+     when: gluster == "yes" and ansible_distribution == 'Debian'
+     with_items: "{{ gluster | default([]) }}"
+
+   - name: Add Gluster repository key
+     shell: "wget -O - https://download.gluster.org/pub/gluster/glusterfs/9/rsa.pub | apt-key add - > gluster-repository-key.txt"
+     args:
+       chdir: $HOME
+       creates: gluster-repository-key.txt
+     when: gluster == "yes" and ansible_distribution == 'Debian'
+     with_items: "{{ gluster | default([]) }}"
+
+   - name: Add Gluster repository
+     shell: "echo deb [arch=amd64] https://download.gluster.org/pub/gluster/glusterfs/9/LATEST/Debian/buster/amd64/apt buster main > /etc/apt/sources.list.d/gluster.list > gluster-repository.txt"
+     args:
+       chdir: $HOME
+       creates: gluster-repository.txt
+     when: gluster == "yes" and ansible_distribution == 'Debian'
+     with_items: "{{ gluster | default([]) }}"
+
+   - name: install glusterfs-server
+     apt:
+       name: glusterfs-server
+       state: present
+       update_cache: yes
+     when: gluster == "yes"
+     with_items: "{{ gluster | default([]) }}"
+   
+   - name: Start Gluster
+     service:
+       name: glusterd.service
+       state: started
+     when: gluster == "yes"
+     with_items: "{{ gluster | default([]) }}"
+
+   - name: Enable service Gluster
+     service:
+       name: glusterd.service
+       enabled: yes
+     when: gluster == "yes"
+     with_items: "{{ gluster | default([]) }}"
+
+   - name: Gluster Probe
+     shell: "gluster peer probe {{ ansible_hostname }} > probe-{{ ansible_hostname }}.txt"
+     args:
+       chdir: $HOME
+       creates: probe-{{ ansible_hostname }}.txt
+     delegate_to: "{{ master_node_delegate }}"
+     when: gluster == "yes" and lb_slave == "yes"
+     with_items: "{{ (gluster | default([])) and (lb_slave | default([])) }}"

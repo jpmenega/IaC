@@ -1,0 +1,4 @@
+/mnt/UZ         192.168.20.14(ro,sync,no_subtree_check,all_squash,anonuid=1001,anongid=1001)
+/backup/urbackup  192.168.1.245/255.255.255.255(rw,sync,no_subtree_check,all_squash,anonuid=115,anongid=119)
+/backup/zabbix  192.168.1.244/255.255.255.255(rw,sync,no_subtree_check)
+/backup/firebird 192.168.1.251/255.255.255.255(rw,sync,no_subtree_check)

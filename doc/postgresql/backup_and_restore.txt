@@ -1,0 +1,25 @@
+SELECT pg_size_pretty( pg_database_size('YB008R') );
+SELECT pg_size_pretty( pg_database_size('YB019') );
+SELECT pg_size_pretty( pg_database_size('YB019FR') );
+SELECT pg_size_pretty( pg_database_size('destra') );
+SELECT pg_size_pretty( pg_database_size('yb_backup') );
+
+
+Backup no servidor velho
+pg_dump -U postgres -F c -b -v -f YB008R.backup YB008R
+pg_dump -U postgres -F c -b -v -f YB019.backup YB019
+pg_dump -U postgres -F c -b -v -f YB019FR.backup YB019FR
+pg_dump -U postgres -F c -b -v -f destra.backup destra
+pg_dump -U postgres -F c -b -v -f yb_backup.backup yb_backup
+
+Restore no servidor novo
+pg_restore -U postgres -d YB008R -v "YB008R.backup"
+pg_restore -U postgres -d YB019 -v "YB019.backup"
+pg_restore -U postgres -d YB019FR -v "YB019FR.backup"
+pg_restore -U postgres -d destra -v "destra.backup"
+pg_restore -U postgres -d yb_backup -v "yb_backup.backup"
+
+
+Linha de comando usada pelo Rafael para fazer backup
+cd C:\Program Files (x86)\pgAdmin III\1.22
+pg_dump.exe --host 192.168.15.10 --port 5432 --username "postgres" --no-password  --format plain --encoding UTF8 --inserts  --verbose   --file "\\192.168.15.10\bkp_db\2019-07-04_00-55.sql" "YB008R"

@@ -1,0 +1,28 @@
+============================
+Source script server pre req
+apt install ansible
+ssh-keygen
+ssh-copy-id root@<node_ip>
+============================
+Source script server
+mkdir ~/docker-cluster
+cd ~/docker-cluster
+
+nano ~/docker-cluster/hosts-urbackup (alterar IPs)
+
+ansible-playbook -i hosts-urbackup main/initial.yml
+ansible-playbook -i hosts-urbackup backup/urbackup-server.yml
+ansible-playbook -i hosts-urbackup backup/urbackup-monitor.yml
+
+Diretorio banco de dados urbackup 
+- /var/urbackup
+
+Crontab replica offsite
+# Backup replica offsite
+0 4 * * * /usr/local/sbin/replica.sh >/var/log/replica.log
+
+Replica
+-Customize /usr/local/sbin/replica.sh
+-Configure replica destination (see README.txt for details)
+-Create crontab job
+-Add Zabbix template to monitor replica

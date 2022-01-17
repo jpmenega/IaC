@@ -1,0 +1,34 @@
+virt-install --virt-type=kvm --name mssqlserver01 --ram 2048 --vcpus=2 --os-variant=ubuntu19.04 --cdrom=/var/lib/libvirt/boot/ubuntu-20.04.3-live-server-amd64.iso --network=bridge=br0,model=virtio --graphic vnc --disk path=/var/lib/libvirt/images/mssqlserver01.qcow2,size=20,bus=virtio,format=qcow2 --disk path=/var/lib/libvirt/images/mssqlserver01-data.qcow2,size=30,bus=virtio,format=qcow2
+
+#importacao no hypervisor velho
+virt-install --import --virt-type=kvm --name mssqlserver01 --ram 4096 --vcpus=2 --os-variant=debian8 --network=bridge=br0,model=virtio --graphic vnc --disk path=/var/lib/libvirt/images/mssqlserver01.qcow2,bus=virtio,format=qcow2 --disk path=/var/lib/libvirt/images/mssqlserver01-data.qcow2,bus=virtio,format=qcow2
+
+
+===========================
+sudo su
+passwd
+
+vi /etc/ssh/sshd_config (PermitRootLogin yes)
+service sshd restart
+
+-----
+#vim.tiny /etc/network/interfaces
+auto eth0
+iface eth0 inet static
+  address 192.168.16.241
+  netmask 255.255.255.0
+  gateway 192.168.16.1
+  dns-nameservers 192.168.16.1
+  mtu 9000
+
+#vim.tiny /etc/resolv.conf
+search medlav.intranet
+nameserver 192.168.16.1
+----
+reboot
+netplan apply (nao funcionaria pois alteramos o nome da NIC no GRUB)
+
+cfdisk /dev/vdb
+mkfs.ext4 -f /dev/vdb1
+
+Data disk (vdb1) mount point /var/opt/

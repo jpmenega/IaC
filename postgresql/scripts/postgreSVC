@@ -1,0 +1,270 @@
+#!/bin/bash
+#
+# Resource script for PostgreSQL daemon
+#
+# Description:  Manages postgresql daemon as an OCF resource in
+#               an High Availability setup.
+#
+#       usage: $0 {start|stop|status|monitor|validate-all|meta-data}
+#
+#       The "start" arg starts postgresql.
+#
+#       The "stop" arg stops it.
+#
+# OCF parameters:
+# OCF_RESKEY_binpath
+# OCF_RESKEY_conffile
+# OCF_RESKEY_extraconf
+#
+# Note:This RA requires that the postgresql config files has a "pidfile"
+# entry so that it is able to act on the correct process
+##########################################################################
+# Initialization:
+
+: ${OCF_FUNCTIONS_DIR=${OCF_ROOT}/resource.d/heartbeat}
+. ${OCF_FUNCTIONS_DIR}/.ocf-shellfuncs
+
+USAGE="Usage: $0 {start|stop|status|monitor|validate-all|meta-data}";
+
+##########################################################################
+
+usage()
+{
+        echo $USAGE >&2
+}
+
+meta_data()
+{
+cat <<END
+<?xml version="1.0"?>
+<!DOCTYPE resource-agent SYSTEM "ra-api-1.dtd">
+<resource-agent name="postgresql">
+<version>1.0</version>
+<longdesc lang="en">
+This script manages postgresql daemon
+</longdesc>
+<shortdesc lang="en">Manages a postgresql daemon</shortdesc>
+
+<parameters>
+
+<parameter name="binpath">
+<longdesc lang="en">
+The postgresql binary path.
+For example, "/usr/lib/postgresql/11/bin/postgres"
+</longdesc>
+<shortdesc lang="en">Full path to the postgresql binary</shortdesc>
+<content type="string" default="/usr/lib/postgresql/11/bin/postgres"/>
+</parameter>
+
+<parameter name="conffile">
+<longdesc lang="en">
+The postgresql daemon configuration file name with full path.
+For example, "/etc/postgresql/11/main/postgresql.conf"
+</longdesc>
+<shortdesc lang="en">Configuration file name with full path</shortdesc>
+<content type="string" default="/etc/postgresql/11/main/postgresql.conf" />
+</parameter>
+
+</parameters>
+
+<actions>
+<action name="start" timeout="20s"/>
+<action name="stop" timeout="20s"/>
+<action name="monitor" depth="0" timeout="20s" interval="60s" />
+<action name="validate-all" timeout="20s"/>
+<action name="meta-data"  timeout="5s"/>
+</actions>
+</resource-agent>
+END
+exit $OCF_SUCCESS
+}
+
+get_pid_and_conf_file()
+{
+        #if [ -n "$OCF_RESKEY_conffile" ]; then
+        #        CONF_FILE=$OCF_RESKEY_conffile
+        #else
+        #        CONF_FILE="/etc/postgresql/11/main/postgresql.conf"
+        #fi
+
+        #PIDFILE="`grep -v \"#\" ${CONF_FILE} | grep \"pidfile\" | sed 's/^[ \t]*pidfile[ \t]*//'`"
+        #if [ "${PIDFILE}" = '' ]; then
+                PIDFILE="/run/postgresql/11-main.pid"
+        #fi
+}
+
+postgresql_status()
+{
+        if [ -n "$PIDFILE" -a -f "$PIDFILE" ]; then
+                # postgresql is probably running
+                PID=`cat $PIDFILE`
+                if [ -n "$PID" ]; then
+                        if ps -p $PID | grep postgres >/dev/null ; then
+                                ocf_log info "info postgresql daemon running"
+                                return $OCF_SUCCESS
+                        else
+                                ocf_log info "postgresql daemon is not running but pid file exists"
+                                return $OCF_NOT_RUNNING
+                        fi
+                else
+                        ocf_log err "PID file empty!"
+                        return $OCF_ERR_GENERIC
+                fi
+        fi
+
+        # postgresql is not running
+        ocf_log info "postgresql daemon is not running"
+        return $OCF_NOT_RUNNING
+}
+
+is_isolation()
+{
+        cnt=3
+        testIP=<check_isolation_ip>
+        #testIP=1.2.3.4
+        nodePeer=<nodePeer>
+        #nodePeer=1.2.3.4
+        recv=$(/bin/ping -c 1 -w 3 -q $nodePeer | grep received | cut -d, -f2 | awk '{print $1}')
+        if [ "$recv" -eq 0 ]; then
+            recv=$(/bin/ping -c $cnt -q $testIP | grep received | cut -d, -f2 | awk '{print $1}')
+            if [ "$recv" -eq 0 ]; then
+                return 1
+            fi
+        fi
+        return 0
+}
+
+postgresql_start()
+{
+        # if postgresql_ is running return success
+        postgresql_status
+        retVal=$?
+        if [ $retVal -eq $OCF_SUCCESS ]; then
+                exit $OCF_SUCCESS
+	elif [ $retVal -ne $OCF_NOT_RUNNING ]; then
+                ocf_log err "Error. Unknown status."
+                exit $OCF_ERR_GENERIC
+        fi
+
+	is_isolation
+        if [ $? -eq 1 ]; then
+            ocf_log err "Error. Node is alone, process halted to avoid active-active."
+            exit $OCF_ERR_GENERIC
+        fi
+
+	drbdadm primary postgres --force
+        retVal=$?
+        if [ $retVal -ne 0 ]; then
+                ocf_log err "Error. Can't bring DRBD node as primary."
+                exit $OCF_ERR_GENERIC
+        fi
+
+        if ! (grep -qs '/mnt/postgresql ' /proc/mounts;) then
+                mount -o acl /dev/<drbd_postgresql_volume> /mnt/postgresql
+                if ! (grep -qs '/mnt/postgresql ' /proc/mounts;) then
+                    ocf_log err "Error. Can't mount postgresql DRBD partition."
+                    exit $OCF_ERR_GENERIC
+                fi
+        fi
+
+	su postgres -c "/usr/lib/postgresql/11/bin/pg_ctl start -D /etc/postgresql/11/main/"
+        #$COMMAND
+
+	sleep 1
+        postgresql_status
+        retVal=$?
+        if [ $retVal -eq $OCF_NOT_RUNNING ]; then
+                ocf_log err "Error. Unknown status."
+                exit $OCF_ERR_GENERIC
+        fi
+
+        ocf_log info "Started postgresql daemon."
+        exit $OCF_SUCCESS
+}
+
+
+postgresql_stop()
+{
+	if postgresql_status ; then
+		su postgres -c "/usr/lib/postgresql/11/bin/pg_ctl stop -D /etc/postgresql/11/main/"
+		sleep 5
+		#Best practice, never kill
+		#if postgresql_status ; then
+		#	killall postgres
+		#fi
+        fi
+        umount -f /mnt/postgresql
+        drbdadm secondary postgres
+
+        ocf_log info "Stopped postgresql daemon."
+        exit $OCF_SUCCESS
+}
+
+postgresql_monitor()
+{
+        postgresql_status
+}
+
+postgresql_validate_all()
+{
+        if [ -n "$OCF_RESKEY_binpath" -a ! -x "$OCF_RESKEY_binpath" ]; then
+                ocf_log err "Binary path $OCF_RESKEY_binpath does not exist."
+                exit $OCF_ERR_ARGS
+        fi
+        if [ -n "$OCF_RESKEY_conffile" -a ! -f "$OCF_RESKEY_conffile" ]; then
+                ocf_log err "Config file $OCF_RESKEY_conffile does not exist."
+                exit $OCF_ERR_ARGS
+        fi
+
+        #if  grep -v "^#" "$CONF_FILE" | grep "pidfile" > /dev/null ; then
+        #        :
+        #else
+        #        ocf_log err "Error. \"pidfile\" entry required in the postgresql config file
+        #        return $OCF_ERR_GENERIC
+        #fi
+
+        return $OCF_SUCCESS
+}
+
+
+#
+# Main
+#
+
+if [ $# -ne 1 ]; then
+        usage
+        exit $OCF_ERR_ARGS
+fi
+
+case $1 in
+        start)  get_pid_and_conf_file
+                postgresql_start
+                ;;
+
+        stop)   get_pid_and_conf_file
+                postgresql_stop
+                ;;
+
+        status) get_pid_and_conf_file
+                postgresql_status
+                ;;
+
+        monitor)get_pid_and_conf_file
+                postgresql_monitor
+                ;;
+
+        validate-all)   get_pid_and_conf_file
+                        postgresql_validate_all
+                        ;;
+
+        meta-data)      meta_data
+                        ;;
+
+        usage)  usage
+                exit $OCF_SUCCESS
+                ;;
+
+        *)      usage
+                exit $OCF_ERR_UNIMPLEMENTED
+                ;;
+esac

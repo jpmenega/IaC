@@ -1,0 +1,9 @@
+#Verificar suporte a virtualizacao
+https://www.claudiokuenzler.com/blog/956/unable-create-kvm-virtual-achine-host-does-not-support-domain-type-kvm-for-virtualization
+
+#Benchmark
+https://github.com/haydenjames/bench-scripts/blob/master/README.md#benchsh
+https://haydenjames.io/linux-benchmark-scripts-tools/
+https://bench.sh/
+        wget -qO- bench.sh | bash
+        curl -Lso- bench.sh | bash

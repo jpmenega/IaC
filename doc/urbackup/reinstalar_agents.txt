@@ -1,0 +1,7 @@
+- Parar servico do agent
+- Cria e configura device na console do UrBackup
+- Renomeia a pasta /usr/local/etc/urbackup (para guardar scripts como prefilebackup, postfilebackup etc)
+- Renomeia a pasta /usr/local/var/urbackup
+- Executa linha de comando de instalacao do client
+- Restaura scripts da pasta urbackup-old
+- Parar ou reiniciar servico do agent

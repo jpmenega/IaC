@@ -1,0 +1,29 @@
+https://www.youtube.com/watch?v=7gZLiTa3150
+
+virt-v2v -i ova /var/lib/libvirt/images/WebServer.ova -o libvirt -of qcow2 -os images -n default
+
+virsh domiflist WebServer (mostra as NICs importadas do Virtualbox e o mac)
+virsh detach-interface WebServer --type bridge --mac 52:54:00:3d:9b:2b --config (remove a NIC)
+virsh net-list --all (mostra as redes do KVM)
+virsh net-dumpxml default (mostra detalhes da rede do KVM - name)
+virsh attach-interface WebServer --type bridge --source br0 --config (attacha rede bridge)
+virsh attach-interface WebServer --type network --source default --config (apenas exemplo)
+
+virsh list --all
+virsh start WebServer
+
+Importou dessa forma mas dava problema de permissao no arquivo da imagem
+    <disk type='volume' device='disk'>
+      <driver name='qemu' type='qcow2' cache='none'/>
+      <source pool='images' volume='WebServer-sda'/>
+      <target dev='hda' bus='ide'/>
+      <address type='drive' controller='0' bus='0' target='0' unit='0'/>
+    </disk>
+
+Alterei de volume para file:
+    <disk type='file' device='disk'>
+      <driver name='qemu' type='qcow2' cache='none'/>
+      <source file='/var/lib/libvirt/images/WebServer-sda'/>
+      <target dev='hda' bus='ide'/>
+      <address type='drive' controller='0' bus='0' target='0' unit='0'/>
+    </disk>

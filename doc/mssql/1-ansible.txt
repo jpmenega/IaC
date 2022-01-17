@@ -1,0 +1,78 @@
+============================
+Source script server pre req
+apt install ansible
+ssh-keygen
+ssh-copy-id root@<node_ip>
+============================
+Source script server
+mkdir ~/docker-cluster
+cd ~/docker-cluster
+
+nano hosts-mssql (alterar IPs)
+
+ansible-playbook -i hosts-mssql main/initial.yml
+//ansible-playbook -i hosts-mssql lb/loadbalancer.yml
+
+//ansible-playbook -i hosts-mssql mssql/mssql.yml
+
+https://docs.microsoft.com/pt-br/sql/linux/quickstart-install-connect-ubuntu?view=sql-server-ver15
+
+==========
+INSTALACAO
+==========
+wget -qO- https://packages.microsoft.com/keys/microsoft.asc | sudo apt-key add -
+sudo add-apt-repository "$(wget -qO- https://packages.microsoft.com/config/ubuntu/20.04/mssql-server-2019.list)"
+sudo apt-get update
+sudo apt-get install -y mssql-server
+sudo /opt/mssql/bin/mssql-conf setup
+systemctl status mssql-server --no-pager
+
+
+curl https://packages.microsoft.com/keys/microsoft.asc | sudo apt-key add -
+curl https://packages.microsoft.com/config/ubuntu/20.04/prod.list | sudo tee /etc/apt/sources.list.d/msprod.list
+sudo apt-get update 
+sudo apt-get install mssql-tools unixodbc-dev
+sudo apt-get update 
+sudo apt-get install mssql-tools 
+
+echo 'export PATH="$PATH:/opt/mssql-tools/bin"' >> ~/.bash_profile
+echo 'export PATH="$PATH:/opt/mssql-tools/bin"' >> ~/.bashrc
+source ~/.bashrc
+
+sqlcmd -S localhost -U SA -P '<YourPassword>'
+
+BACKUP
+UrBackup
+-cria servidor na console do UrBackup (Internet client/client behind NAT)
+-copia URL/script para instalacao (ainda nao instala)
+ TF=`mktemp` && wget "http://192.168.15.23:55414/x?a=download_client&lang=en&clientid=5&authkey=eCso9RkjHQ&os=linux" -O $TF && sudo sh $TF; rm -f $TF
+-configura o schedule file backup (/var/opt/mssql/backup) etc na console
+-instala o client
+
+ansible-playbook -i hosts-mssql mssql/backup-client.yml
+
+MONITORACAO ZABBIX
+Usar template: "MSSQL by ODBC"
+Instalar ODBC driver nos Zabbix servers:
+https://docs.microsoft.com/pt-br/sql/connect/odbc/linux-mac/installing-the-microsoft-odbc-driver-for-sql-server?view=sql-server-ver15
+
+Configurara ODBC
+root@zabbix01:~# cat /etc/odbc.ini
+[MSSQLSERVER01]
+Driver = ODBC Driver 17 for SQL Server
+Description = MSSQL test
+Server = tcp:192.168.15.24,1433
+
+
+==========================
+BACKUP AND RESTORE EXAMPLES
+===========================
+mkdir /var/opt/mssql/backup
+chown mssql.mssql /var/opt/mssql/backup/
+
+sqlcmd -S localhost -U backup -P 'h56mmqLEMsQP5DT8' -Q "BACKUP DATABASE [SecullumMEDLAV] TO DISK = '/var/opt/mssql/backup/SecullumMEDLAV.bak' WITH NOFORMAT, NOINIT, NAME = 'SecullumMEDLAV-Full Database Backup', SKIP, NOREWIND, NOUNLOAD, STATS = 10"
+
+sqlcmd -S localhost -U backup -P 'h56mmqLEMsQP5DT8' -Q "RESTORE DATABASE SecullumMEDLAV FROM DISK = '/var/opt/mssql/backup/SecullumMEDLAV.bak' WITH MOVE 'Secullum' TO '/var/opt/mssql/data/SecullumMEDLAV.mdf', MOVE 'Secullum_Log' TO '/var/opt/mssql/data/SecullumMEDLAV_Log.ldf'"
+
+Para os dados fornecidos pela Display eu tive que fazer os restore como Secullum (talvez pq fosse o nome original) e depois renomeei o banco para SecullumMEDLAV:
+sqlcmd -S localhost -U sa -P '<sa_password>' -Q "RESTORE DATABASE Secullum FROM DISK = '/var/opt/mssql/backup/bkp_09_11_2021.bak' WITH MOVE 'Secullum' TO '/var/opt/mssql/data/SecullumMEDLAV.mdf', MOVE 'Secullum_Log' TO '/var/opt/mssql/data/SecullumMEDLAV_Log.ldf'"

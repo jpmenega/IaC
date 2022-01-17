@@ -1,0 +1,14 @@
+https://www.howtoforge.com/tutorial/how-to-setup-iscsi-storage-server-on-ubuntu-2004-lts/
+
+# apt-get install tgt -y
+# systemctl status tgt
+# nano /etc/tgt/conf.d/iscsi.conf
+<target iqn.2021-09.medlav.intranet:lun1>
+     backing-store /dev/disk/by-id/usb-Seagate_Expansion_Desk_NA8E6EL9-0\:0
+     initiator-address 192.168.15.23
+     incominguser iscsi-user password
+     outgoinguser iscsi-target secretpass
+</target>
+
+# systemctl restart tgt
+# tgtadm --mode target --op show

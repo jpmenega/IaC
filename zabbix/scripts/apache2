@@ -1,0 +1,237 @@
+#!/bin/bash
+#
+# Resource script for apache2 daemon
+#
+# Description:  Manages apache2 daemon as an OCF resource in
+#               an High Availability setup.
+#
+#       usage: $0 {start|stop|status|monitor|validate-all|meta-data}
+#
+#       The "start" arg starts samba.
+#
+#       The "stop" arg stops it.
+#
+# OCF parameters:
+# OCF_RESKEY_scriptpath
+# OCF_RESKEY_conffile
+# OCF_RESKEY_extraconf
+#
+# Note:This RA requires that the samba config files has a "pidfile"
+# entry so that it is able to act on the correct process
+##########################################################################
+# Initialization:
+
+: ${OCF_FUNCTIONS_DIR=${OCF_ROOT}/resource.d/heartbeat}
+. ${OCF_FUNCTIONS_DIR}/.ocf-shellfuncs
+
+USAGE="Usage: $0 {start|stop|status|monitor|validate-all|meta-data}";
+
+##########################################################################
+
+usage()
+{
+        echo $USAGE >&2
+}
+
+meta_data()
+{
+cat <<END
+<?xml version="1.0"?>
+<!DOCTYPE resource-agent SYSTEM "ra-api-1.dtd">
+<resource-agent name="apache2">
+<version>1.0</version>
+<longdesc lang="en">
+This script manages apache2 daemon
+</longdesc>
+<shortdesc lang="en">Manages an apache2 daemon</shortdesc>
+
+<parameters>
+
+<parameter name="scriptpath">
+<longdesc lang="en">
+The apache2 script path.
+For example, "/etc/init.d/apache2"
+</longdesc>
+<shortdesc lang="en">Full path to the apache2 script</shortdesc>
+<content type="string" default="/etc/init.d/apache2"/>
+</parameter>
+
+<parameter name="conffile">
+<longdesc lang="en">
+The samba daemon configuration file name with full path.
+For example, "/etc/apache2/apache2.conf"
+</longdesc>
+<shortdesc lang="en">Configuration file name with full path</shortdesc>
+<content type="string" default="/etc/apache2/apache2.conf" />
+</parameter>
+
+</parameters>
+
+<actions>
+<action name="start" timeout="20s"/>
+<action name="stop" timeout="20s"/>
+<action name="monitor" depth="0" timeout="20s" interval="60s" />
+<action name="validate-all" timeout="20s"/>
+<action name="meta-data"  timeout="5s"/>
+</actions>
+</resource-agent>
+END
+exit $OCF_SUCCESS
+}
+
+get_pid_and_conf_file()
+{
+        if [ -n "$OCF_RESKEY_conffile" ]; then
+                CONF_FILE=$OCF_RESKEY_conffile
+        else
+                CONF_FILE="/etc/apache2/apache2.conf"
+        fi
+
+        PIDFILE="`grep -v \"#\" ${CONF_FILE} | grep \"pidfile\" | sed 's/^[ \t]*pidfile[ \t]*//'`"
+        if [ "${PIDFILE}" = '' ]; then
+                PIDFILE="/var/run/apache2/apache2.pid"
+        fi
+}
+
+apache2_status()
+{
+        if [ -n "$PIDFILE" -a -f "$PIDFILE" ]; then
+                # apache2 is probably running
+                PID=`cat $PIDFILE`
+                if [ -n "$PID" ]; then
+                        if ps -p $PID | grep apache2 >/dev/null ; then
+                                ocf_log info "info apache2 daemon running"
+                                return $OCF_SUCCESS
+                        else
+                                ocf_log info "apache2 daemon is not running but pid file exists"
+                                return $OCF_NOT_RUNNING
+                        fi
+                else
+                        ocf_log err "PID file empty!"
+                        return $OCF_ERR_GENERIC
+                fi
+        fi
+
+        # apache2 is not running
+        ocf_log info "apache2 daemon is not running"
+        return $OCF_NOT_RUNNING
+}
+
+apache2_start()
+{
+        # if apache2 is running return success
+        apache2_status
+        retVal=$?
+        if [ $retVal -eq $OCF_SUCCESS ]; then
+                exit $OCF_SUCCESS
+        elif [ $retVal -ne $OCF_NOT_RUNNING ]; then
+                ocf_log err "Error. Unknown status."
+                exit $OCF_ERR_GENERIC
+        fi
+
+        if [ -n "$OCF_RESKEY_scriptpath" ]; then
+                COMMAND="$OCF_RESKEY_scriptpath"
+        else
+                COMMAND="service apache2 start"
+        fi
+
+        $COMMAND
+        if [ $? -ne 0 ]; then
+                ocf_log err "Error. apache2 daemon returned error $?."
+                exit $OCF_ERR_GENERIC
+        fi
+
+        ocf_log info "Started apache2 daemon."
+        exit $OCF_SUCCESS
+}
+
+
+apache2_stop()
+{
+        if apache2_status ; then
+                PID=`cat $PIDFILE`
+                if [ -n "$PID" ] ; then
+                        #kill $PID
+                        service apache2 stop
+                        if [ $? -ne 0 ]; then
+                                kill -SIGKILL $PID
+                                if [ $? -ne 0 ]; then
+                                        ocf_log err "Error. Could not stop apache2 daemon."
+                                        return $OCF_ERR_GENERIC
+                                fi
+                        fi
+                        rm $PIDFILE 2>/dev/null
+                fi
+        fi
+        ocf_log info "Stopped apache2 daemon."
+        exit $OCF_SUCCESS
+}
+
+apache2_monitor()
+{
+        apache2_status
+}
+
+msyql_validate_all()
+{
+        if [ -n "$OCF_RESKEY_scriptpath" -a ! -x "$OCF_RESKEY_scriptpath" ]; then
+                ocf_log err "Script path $OCF_RESKEY_scriptpath does not exist."
+                exit $OCF_ERR_ARGS
+        fi
+        if [ -n "$OCF_RESKEY_conffile" -a ! -f "$OCF_RESKEY_conffile" ]; then
+                ocf_log err "Config file $OCF_RESKEY_conffile does not exist."
+                exit $OCF_ERR_ARGS
+        fi
+
+        #if  grep -v "^#" "$CONF_FILE" | grep "pidfile" > /dev/null ; then
+        #        :
+        #else
+        #        ocf_log err "Error. \"pidfile\" entry required in the samba config file by samba OCF RA."
+        #        return $OCF_ERR_GENERIC
+        #fi
+
+        return $OCF_SUCCESS
+}
+
+
+#
+# Main
+#
+
+if [ $# -ne 1 ]; then
+        usage
+        exit $OCF_ERR_ARGS
+fi
+
+case $1 in
+        start)  get_pid_and_conf_file
+                apache2_start
+                ;;
+
+        stop)   get_pid_and_conf_file
+                apache2_stop
+                ;;
+
+        status) get_pid_and_conf_file
+                apache2_status
+                ;;
+
+        monitor)get_pid_and_conf_file
+                apache2_monitor
+                ;;
+
+        validate-all)   get_pid_and_conf_file
+                        apache2_validate_all
+                        ;;
+
+        meta-data)      meta_data
+                        ;;
+
+        usage)  usage
+                exit $OCF_SUCCESS
+                ;;
+
+        *)      usage
+                exit $OCF_ERR_UNIMPLEMENTED
+                ;;
+esac

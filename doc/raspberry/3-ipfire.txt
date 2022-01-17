@@ -1,0 +1,12 @@
+BACKUP AND RESTORE
+
+# ln -s /usr/local/bin/convert-to-location /bin/convert-to-location
+# ln -s /usr/local/bin/firewallctrl /bin/firewallctrl
+# ln -s /usr/local/bin/convert-ovpn /bin/convert-ovpn
+# ln -s /usr/local/bin/convert-dns-settings /bin/convert-dns-settings
+
+# cp /var/ipfire/backup/<backup>.ipf /tmp/restore.ipf
+# /usr/local/bin/backupctrl restore
+
+# cp /var/ipfire/backup/addons/backup/zabbix_agentd.ipf /tmp/addon-zabbix_agentd.ipf
+# /usr/local/bin/backupctrl restoreaddon zabbix_agentd

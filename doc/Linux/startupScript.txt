@@ -1,0 +1,21 @@
+vim.tiny /etc/startup.sh
+==============================
+#!/bin/bash
+
+/usr/bin/virsh start pfSense02
+==============================
+chmod +x /etc/startup.sh
+
+vim.tiny /etc/systemd/system/startup.service
+=========================
+[Unit]
+After=kvmStartVMs.service
+
+[Service]
+ExecStart=/etc/startup.sh
+
+[Install]
+WantedBy=default.target
+=========================
+systemctl daemon-reload
+systemctl enable startup.service

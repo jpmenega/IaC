@@ -1,0 +1,9 @@
+    <disk type='file' device='cdrom'>
+      <driver name='qemu' type='raw'/>
+      <target dev='sdb' bus='sata'/>
+      <readonly/>
+      <address type='drive' controller='1' bus='0' target='0' unit='0'/>
+    </disk>
+
+com VM iniciada:
+virsh attach-disk WebServer /var/lib/libvirt/boot/virtio-win.iso sdb --type cdrom --mode readonly

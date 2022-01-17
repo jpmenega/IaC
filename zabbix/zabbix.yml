@@ -1,0 +1,516 @@
+#https://bestmonitoringtools.com/how-to-install-zabbix-server-on-ubuntu/
+- hosts: active
+  become: yes
+  tasks:
+    - name: Disable service systemd-resolved
+      service:
+        name: systemd-resolved.service
+        enabled: no
+      when: ansible_distribution == 'Ubuntu'
+
+    - name: Stop systemd-resolved
+      service:
+        name: systemd-resolved.service
+        state: stopped
+      when: ansible_distribution == 'Ubuntu'
+
+    - name: Remove resolv.conf managed
+      file:
+        path: /etc/resolv.conf
+        state: absent
+
+    - name: Creating resolv.conf
+      copy:
+        dest: "/etc/resolv.conf"
+        content: |
+          nameserver {{ name_server }}
+          search {{ domain_name }}
+
+    - name: "apt update"
+      apt:
+       update_cache: true
+
+    - name: "Install Zabbix Server"
+      apt:
+       name: zabbix-server-mysql
+       state: present
+
+    - name: "Install zabbix-sql-scripts"
+      apt:
+       name: zabbix-sql-scripts
+       state: present
+
+    - name: "Install Zabbix Frontend"
+      apt:
+       name: zabbix-frontend-php
+       state: present
+
+    - name: "Install Apache"
+      apt:
+       name: zabbix-apache-conf
+       state: present
+
+    - name: Disable service apache2
+      service:
+        name: apache2.service
+        enabled: no
+
+    - name: Stop apache2
+      service:
+        name: apache2.service
+        state: stopped
+
+    - name: Create Zabbix Home
+      file:
+        path: /var/lib/zabbix
+        state: directory
+
+    - name: Creating .my.cnf (for monitoring database)
+      copy:
+        dest: "/var/lib/zabbix/.my.cnf"
+        content: |
+          [client]
+          user='zabbix'
+          password='{{ mysql_zabbix_password }}'
+
+    - name: Recursively change ownership of Zabbix home folder
+      file:
+        path: /var/lib/zabbix
+        state: directory
+        recurse: yes
+        owner: zabbix
+        group: zabbix
+
+    - name: Download MySQL Zabbix monitoring template
+      shell: "wget {{ git_source }}/zabbix/config/template_db_mysql.conf"
+      args:
+        chdir: /etc/zabbix/zabbix_agentd.d/
+        creates: /etc/zabbix/zabbix_agentd.d/template_db_mysql.conf
+
+    - name: Restart zabbix-agent
+      service:
+        name: zabbix-agent.service
+        state: restarted
+
+    - name: Create Zabbix MySQL data folder
+      file:
+        path: /var/lib/mysql
+        state: directory
+
+    - name: Turn primary node as DRBD primary
+      shell: "drbdadm primary zabbix"
+      when: lb_primary == "yes"
+      with_items: "{{ (lb_primary | default([])) }}"
+
+    - name: Mount DRBD on primary node only
+      mount:
+        path: /var/lib/mysql
+        src: /dev/{{ drbd_zabbix_volume }}
+        opts: acl
+        fstype: ext4
+        state: mounted
+      when: lb_primary == "yes"
+      with_items: "{{ (lb_primary | default([])) }}"
+
+    - name: "Install mariadb-common"
+      apt:
+        name: mariadb-common
+        state: present
+
+    - name: "Install mariadb-client"
+      apt:
+        name: mariadb-client
+        state: present
+
+    - name: "Install mariadb-server"
+      apt:
+        name: mariadb-server
+        state: present
+      #throttle: 1
+
+    - name: Disable service mysqld
+      service:
+        name: mysql.service
+        enabled: no
+
+    - name: Stop mysqld
+      service:
+        name: mysql.service
+        state: stopped
+
+    - name: Download storage tunning
+      shell: "wget {{ git_source }}/zabbix/config/default_auth.cnf"
+      args:
+        chdir: /etc/mysql/conf.d/
+        creates: /etc/mysql/conf.d/default_auth.cnf
+
+    - name: "Configure Mysql Listen"
+      lineinfile:
+        dest=/etc/mysql/mariadb.conf.d/50-server.cnf
+        regexp='^bind-address'
+        line="bind-address            = {{ mysql_vip_ip }}"
+        state=present
+
+    - name: Start mysqld on the primary node
+      service:
+        name: mysql.service
+        state: started
+      when: lb_primary == "yes"
+      with_items: "{{ (lb_primary | default([])) }}"
+
+    - name: Set root pwd
+      shell: "echo \"SET PASSWORD FOR 'root'@'localhost' = PASSWORD('{{ mysql_zabbix_password }}');\" | mysql -u root mysql > zabbix-mysql-root-pwd.txt"
+      args:
+        chdir: $HOME
+        creates: zabbix-mysql-root-pwd.txt
+      when: lb_primary == "yes"
+      with_items: "{{ (lb_primary | default([])) }}"
+
+    - name: Create Zabbix database
+      shell: "mysql -uroot -p'{{ mysql_zabbix_password }}' -e \"create database zabbix character set utf8 collate utf8_bin;\" > zabbix-mysql-db-create.txt"
+      args:
+        chdir: $HOME
+        creates: zabbix-mysql-db-create.txt
+      when: lb_primary == "yes"
+      with_items: "{{ (lb_primary | default([])) }}"
+
+    - name: Grant zabbix user privileges - localhost
+      shell: "mysql -uroot -p'{{ mysql_zabbix_password }}' -e \"grant all privileges on *.* to zabbix@localhost identified by '{{ mysql_zabbix_password }}';\" > zabbix-mysql-privileges-localhost.txt"
+      args:
+        chdir: $HOME
+        creates: zabbix-mysql-privileges-localhost.txt
+      when: lb_primary == "yes"
+      with_items: "{{ (lb_primary | default([])) }}"
+
+    - name: Grant zabbix user privileges
+      shell: "mysql -uroot -p'{{ mysql_zabbix_password }}' -e \"grant all privileges on zabbix.* to zabbix@{{ item }}.{{ domain_name }} identified by '{{ mysql_zabbix_password }}';\" > zabbix-mysql-privileges-{{ item }}.{{ domain_name }}.txt"
+      delegate_to: "{{ master_node_delegate }}"
+      args:
+        chdir: $HOME
+        creates: zabbix-mysql-privileges-{{ item }}.{{ domain_name }}.txt
+      with_items: "{{ groups['all'] }}"
+
+    - name: MySQL disable strict mode
+      shell: "mysql -uroot -p'{{ mysql_zabbix_password }}' -e \"set global innodb_strict_mode='OFF';\" > zabbix-mysql-disable-strict-mode.txt"
+      args:
+        chdir: $HOME
+        creates: zabbix-mysql-disable-strict-mode.txt
+      when: lb_primary == "yes"
+      with_items: "{{ (lb_primary | default([])) }}"
+
+    - name: Import database schema for Zabbix server
+      shell: "zcat /usr/share/doc/zabbix-sql-scripts/mysql/create.sql.gz | mysql -uzabbix -p'{{ mysql_zabbix_password }}' zabbix > zabbix-mysql-import-schema.txt"
+      args:
+        chdir: $HOME
+        creates: zabbix-mysql-import-schema.txt
+      when: lb_primary == "yes"
+      with_items: "{{ (lb_primary | default([])) }}"
+
+    - name: MySQL enable strict mode
+      shell: "mysql -uroot -p'{{ mysql_zabbix_password }}' -e \"set global innodb_strict_mode='ON';\" > zabbix-mysql-enable-strict-mode.txt"
+      args:
+        chdir: $HOME
+        creates: zabbix-mysql-enable-strict-mode.txt
+      when: lb_primary == "yes"
+      with_items: "{{ (lb_primary | default([])) }}"
+
+    - name: "Configure Zabbix Mysql host"
+      lineinfile: 
+        dest=/etc/zabbix/zabbix_server.conf 
+        regexp='^# DBHost='
+        line="DBHost={{ mysql_vip_ip }}" 
+        state=present
+
+    - name: "Configure Zabbix Mysql password"
+      lineinfile:
+        dest=/etc/zabbix/zabbix_server.conf
+        regexp='^# DBPassword='
+        line="DBPassword={{ mysql_zabbix_password }}"
+        state=present
+    
+    - name: "Configure Apache Frontend timezone"
+      lineinfile:
+        dest=/etc/zabbix/apache.conf
+        regexp='.# php_value date.timezone'
+        line="        php_value date.timezone America/Sao_Paulo"
+        state=present
+
+    - name: "Configure Zabbix Mysql password"
+      lineinfile:
+        dest=/etc/zabbix/zabbix_server.conf
+        regexp='^Timeout='
+        line="Timeout=30"
+        state=present
+
+    - name: Download Frontend database connection config
+      shell: "wget {{ git_source }}/zabbix/config/zabbix.conf.php"
+      args:
+        chdir: /etc/zabbix/web
+        creates: /etc/zabbix/web/zabbix.conf.php
+
+    - name: "Configure Frontend database connection config"
+      replace:
+        path: /etc/zabbix/web/zabbix.conf.php
+        regexp: '<mysql_vip_ip>'
+        replace: '{{ mysql_vip_ip }}'
+
+    - name: "Configure Frontend database connection config"
+      replace:
+        path: /etc/zabbix/web/zabbix.conf.php
+        regexp: '<mysql_zabbix_password>'
+        replace: '{{ mysql_zabbix_password }}'
+
+    - name: Stop mysqld
+      service:
+        name: mysql.service
+        state: stopped
+      when: lb_primary == "yes"
+      with_items: "{{ (lb_primary | default([])) }}"
+
+    - name: Unmount DRBD
+      mount:
+        path: /var/lib/mysql
+        state: unmounted
+      when: lb_primary == "yes"
+      with_items: "{{ (lb_primary | default([])) }}"
+
+    - name: Turn primary node back as DRBD secondary
+      shell: "drbdadm secondary zabbix"
+      when: lb_primary == "yes"
+      with_items: "{{ (lb_primary | default([])) }}"
+
+    - name: Delete var mysql folder from secondary nodes
+      file:
+        state: absent
+        path: /var/lib/mysql
+      when: lb_slave == "yes"
+      with_items: "{{ (lb_slave | default([])) }}"
+
+    - name: Create Zabbix Home
+      file:
+        path: /var/lib/zabbix
+        state: directory
+      when: lb_slave == "yes"
+      with_items: "{{ (lb_slave | default([])) }}"
+
+    - name: Download crm mysql script
+      shell: "wget {{ git_source }}/zabbix/scripts/mysqlSVC"
+      args:
+        chdir: /usr/lib/ocf/resource.d/heartbeat
+        creates: /usr/lib/ocf/resource.d/heartbeat/mysqlSVC
+
+    - name: change mysql script permission
+      file:
+        path: /usr/lib/ocf/resource.d/heartbeat/mysqlSVC
+        state: touch
+        mode: "u=rwx,g=rx,o=rx"
+
+    - name: "Configure mysqlSVC script - check_isolation_ip"
+      replace:
+        path: /usr/lib/ocf/resource.d/heartbeat/mysqlSVC
+        regexp: '<check_isolation_ip>'
+        replace: '{{ check_isolation_ip }}'
+
+    - name: "Configure mysqlSVC script - nodePeer"
+      replace:
+        path: /usr/lib/ocf/resource.d/heartbeat/mysqlSVC
+        regexp: '<nodePeer>'
+        replace: '{{ nodePeer }}'
+
+    - name: "Configure mysqlSVC script - drbd_zabbix_volume"
+      replace:
+        path: /usr/lib/ocf/resource.d/heartbeat/mysqlSVC
+        regexp: '<drbd_zabbix_volume>'
+        replace: '{{ drbd_zabbix_volume }}'
+
+    - name: Download crm apache2 script
+      shell: "wget {{ git_source }}/zabbix/scripts/apache2"
+      args:
+        chdir: /usr/lib/ocf/resource.d/heartbeat
+        creates: /usr/lib/ocf/resource.d/heartbeat/apache2
+
+    - name: change apache2 script permission
+      file:
+        path: /usr/lib/ocf/resource.d/heartbeat/apache2
+        state: touch
+        mode: "u=rwx,g=rx,o=rx"
+
+    - name: Download zabbix script
+      shell: "wget {{ git_source }}/zabbix/scripts/zabbixSVC"
+      args:
+        chdir: /usr/lib/ocf/resource.d/heartbeat
+        creates: /usr/lib/ocf/resource.d/heartbeat/zabbixSVC
+
+    - name: change zabbix script permission
+      file:
+        path: /usr/lib/ocf/resource.d/heartbeat/zabbixSVC
+        state: touch
+        mode: "u=rwx,g=rx,o=rx"
+
+    - name: Put nodes at stand by mode
+      shell: "crm node standby {{ inventory_hostname }} > lb-standby.txt"
+      args:
+        chdir: $HOME
+        creates: lb-standby.txt
+
+    - name: Configure pacemaker MySQL VIP
+      shell: "crm configure primitive mysqlVIP ocf:heartbeat:IPaddr2 params ip=\"{{ mysql_vip_ip }}\" cidr_netmask=\"{{ mysql_vip_netmask }}\" nic=\"{{ mysql_vip_nic }}\" op monitor interval=\"10s\" meta migration-threshold=\"10\" > lb-mysql-vip.txt"
+      args:
+        chdir: $HOME
+        creates: lb-mysql-vip.txt
+      when: lb_primary == "yes"
+      with_items: "{{ lb_primary | default([]) }}"
+
+    - name: Configure pacemaker MySQL service
+      shell: "crm configure primitive mysqlSVC ocf:heartbeat:mysqlSVC params conffile=/etc/mysql/mariadb.conf.d/50-server.cnf op monitor interval=10s timeout=60s op start timeout=120s interval=0 op stop timeout=120s interval=0 meta migration-threshold=10 > lb-mysql-service.txt"
+      args:
+       chdir: $HOME
+       creates: lb-mysql-service.txt
+      when: lb_primary == "yes"
+      with_items: "{{ lb_primary | default([]) }}"
+
+    - name: Configure pacemaker Mysql group
+      shell: "crm configure group grp_mysql mysqlVIP mysqlSVC > lb-mysql-group.txt"
+      args:
+       chdir: $HOME
+       creates: lb-mysql-group.txt
+      when: lb_primary == "yes"
+      with_items: "{{ (lb_primary | default([])) }}"
+
+    - name: Configure mysql lesse prefer zabbix02
+      shell: "crm configure location noprefer-mysql mysqlSVC 50: zabbix02 > lb-mysql-noprefer.txt"
+      args:
+       chdir: $HOME
+       creates: lb-mysql-noprefer.txt
+      when: lb_primary == "yes"
+      with_items: "{{ (lb_primary | default([])) }}"
+
+    - name: Configure mysql prefer zabbix01
+      shell: "crm configure location prefer-mysql mysqlSVC 5: zabbix01 > lb-mysql-prefer.txt"
+      args:
+       chdir: $HOME
+       creates: lb-mysql-prefer.txt
+      when: lb_primary == "yes"
+      with_items: "{{ (lb_primary | default([])) }}"
+
+    - name: Configure pacemaker Zabbix VIP
+      shell: "crm configure primitive zabbixVIP ocf:heartbeat:IPaddr2 params ip=\"{{ cluster_vip_ip }}\" cidr_netmask=\"{{ cluster_vip_netmask }}\" nic=\"{{ cluster_vip_nic }}\" op monitor interval=\"10s\" meta migration-threshold=\"10\" > lb-zabbix-vip.txt"
+      args:
+        chdir: $HOME
+        creates: lb-zabbix-vip.txt
+      when: lb_primary == "yes"
+      with_items: "{{ lb_primary | default([]) }}"
+
+    - name: Configure pacemaker Zabbix service
+      shell: "crm configure primitive zabbixSVC ocf:heartbeat:zabbixSVC params conffile=/etc/zabbix/zabbix_server.conf op monitor interval=10s timeout=60s op start timeout=120s interval=0 op stop timeout=120s interval=0 meta migration-threshold=10 > lb-zabbix-service.txt"
+      args:
+       chdir: $HOME
+       creates: lb-zabbix-service.txt
+      when: lb_primary == "yes"
+      with_items: "{{ lb_primary | default([]) }}"
+
+    - name: Configure pacemaker Apache Frontend service
+      shell: "crm configure primitive apache2SVC ocf:heartbeat:apache2 params conffile=/etc/samba/apache.conf op monitor interval=10s timeout=60s op start timeout=120s interval=0 op stop timeout=120s interval=0 meta migration-threshold=10 > lb-apache2-service.txt"
+      args:
+       chdir: $HOME
+       creates: lb-apache2-service.txt
+      when: lb_primary == "yes"
+      with_items: "{{ lb_primary | default([]) }}"
+
+    - name: Configure pacemaker Zabbix group
+      shell: "crm configure group grp_zabbix zabbixVIP zabbixSVC apache2SVC > lb-zabbix-group.txt"
+      args:
+       chdir: $HOME
+       creates: lb-zabbix-group.txt
+      when: lb_primary == "yes"
+      with_items: "{{ (lb_primary | default([])) }}"
+
+    - name: Configure zabbix less prefer zabbix01
+      shell: "crm configure location noprefer-zabbix zabbixSVC 50: zabbix01 > lb-zabbix-noprefer.txt"
+      args:
+       chdir: $HOME
+       creates: lb-zabbix-noprefer.txt
+      when: lb_primary == "yes"
+      with_items: "{{ (lb_primary | default([])) }}"
+
+    - name: Configure zabbix prefer zabbix02
+      shell: "crm configure location prefer-zabbix zabbixSVC 5: zabbix02 > lb-zabbix-prefer.txt"
+      args:
+       chdir: $HOME
+       creates: lb-zabbix-prefer.txt
+      when: lb_primary == "yes"
+      with_items: "{{ (lb_primary | default([])) }}"
+
+    - name: Configure stickiness to avoid unnecessary move on recover
+      shell: "crm configure rsc_defaults resource-stickiness=100 > lb-zabbix-stickiness.txt"
+      args:
+       chdir: $HOME
+       creates: lb-zabbix-stickiness.txt
+      when: lb_primary == "yes"
+      with_items: "{{ (lb_primary | default([])) }}"
+
+    - name: Configure resource start/stop order
+      shell: "crm configure order o-1 mysqlSVC zabbixSVC apache2SVC symmetrical=true > lb-zabbix-order.txt"
+      args:
+       chdir: $HOME
+       creates: lb-zabbix-stickiness.txt
+      when: lb_primary == "yes"
+      with_items: "{{ (lb_primary | default([])) }}"
+
+    #- name: "Install cifs-utils to allow mount smb as backup destinaiton"
+    #  apt:
+    #   name: cifs-utils
+    #   state: present
+
+    #- name: Download backup script
+    #  shell: "wget {{ git_source }}/zabbix/scripts/backup.sh"
+    #  args:
+    #    chdir: /var/lib/zabbix
+    #    creates: /var/lib/zabbix/backup.sh
+
+    #- name: change backup script permission
+    #  file:
+    #    path: /var/lib/zabbix/backup.sh
+    #    state: touch
+    #    mode: "u=rwx,g=x,o=x"
+
+    #- name: Change ownership of backup script
+    #  file:
+    #    path: /var/lib/zabbix/backup.sh
+    #    owner: zabbix
+    #    group: zabbix
+
+    #- name: "Configure backup script - mysql_vip_ip"
+    #  replace:
+    #    path: /var/lib/zabbix/backup.sh
+    #    regexp: '<mysql_vip_ip>'
+    #    replace: '{{ mysql_vip_ip }}'
+
+    #- name: Create crontab backup job
+    #  cron:
+    #    name: "Backup"
+    #    minute: "0"
+    #    hour: "23"
+    #    job: "/var/lib/zabbix/backup.sh"
+
+    - name: Install smbclient
+      command: apt-get install -y smbclient
+      environment:
+        DEBIAN_FRONTEND: noninteractive
+
+    - name: Download smb_check.sh script
+      get_url:
+        url: "{{ git_source }}/zabbix/scripts/smb_check.sh"
+        dest: "/usr/lib/zabbix/externalscripts"
+
+    - name: Grant execute permition to smb_check.sh script
+      file:
+        path: /usr/lib/zabbix/externalscripts/smb_check.sh
+        state: touch
+        mode: "u=rwx,g=rx,o=rx" 
+
+    - name: Create a symbolic link for externalscripts
+      file:
+        src: /usr/lib/zabbix/externalscripts
+        dest: /usr/share/zabbix/externalscripts
+        state: link

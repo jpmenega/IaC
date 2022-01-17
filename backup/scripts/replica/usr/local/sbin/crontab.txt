@@ -1,0 +1,1 @@
+0 4 * * * /usr/local/sbin/replica.sh >/var/log/replica.log

@@ -1,0 +1,21 @@
+============================
+Source script server pre req
+apt install ansible
+ssh-keygen
+ssh-copy-id root@<node_ip>
+============================
+Source script server
+mkdir ~/docker-cluster
+cd ~/docker-cluster
+
+nano ~/docker-cluster/hosts-raspberry (alterar IPs)
+
+ansible-playbook -i hosts-raspberry main/initial.yml
+ansible-playbook -i hosts-raspberry lb/loadbalancer.yml
+
+ansible-playbook -i hosts-raspberry raspberry/relayModule.yml
+
+ansible-playbook -i hosts-raspberry zabbix/zabbix.yml
+ansible-playbook -i hosts-raspberry samba/samba.yml
+
+

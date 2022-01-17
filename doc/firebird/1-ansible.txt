@@ -1,0 +1,30 @@
+============================
+Source script server pre req
+apt install ansible
+ssh-keygen
+ssh-copy-id root@<node_ip>
+============================
+Source script server
+mkdir ~/docker-cluster
+cd ~/docker-cluster
+
+nano ~/docker-cluster/hosts-firebird (alterar IPs)
+
+ansible-playbook -i hosts-firebird main/initial.yml
+ansible-playbook -i hosts-firebird lb/loadbalancer.yml
+
+ansible-playbook -i hosts-firebird firebird/firebird.yml
+#cat /opt/firebird/SYSDBA.password (get password)
+#service firebird start
+#/opt/firebird/bin/gsec -user sysdba -pass <current_password> -mo sysdba -pw <new_password>
+#service firebird stop
+#rm /opt/firebird/SYSDBA.password
+
+BACKUP (precisa parar o cluster/banco pq o script vai subir o DRDB para copiar os arquivos)
+-cria servidor na console do UrBackup (Internet client/client behind NAT)
+-copia URL/script para instalacao (ainda nao instala)
+-configura o schedule/path etc na console (pasta para bkp /tmp/backup)
+-instala o client e para o servico
+service urbackupclientbackend stop
+ansible-playbook -i hosts-firebird firebird/backup-client.yml
+

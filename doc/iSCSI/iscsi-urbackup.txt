@@ -1,0 +1,61 @@
+# apt install open-iscsi
+# iscsiadm -m discovery -t sendtargets -p 192.168.1.2
+# nano /etc/iscsi/initiatorname.conf  (ou  nano /etc/iscsi/initiatorname.iscsi)
+InitiatorName=iqn.2004-04.com.qnap:ts-231p:iscsi.nas.0a68db
+
+------------
+# nano /etc/iscsi/iscsid.conf
+node.session.auth.authmethod = CHAP
+node.session.auth.username = admin
+node.session.auth.password = Uz21TIUz21TI
+
+OU
+
+# nano /etc/iscsi/nodes/iqn.2021-09.medlav.intranet\:lun1/192.168.15.10\,3260\,1/default
+node.session.auth.authmethod = CHAP  
+node.session.auth.username = iscsi-user
+node.session.auth.password = password          
+node.session.auth.username_in = iscsi-target
+node.session.auth.password_in = secretpass         
+node.startup = automatic
+
+-------------------------
+
+# systemctl restart iscsid open-iscsi
+# (nao precisou, acho que o startup = automatic deve resolver) iscsiadm --mode node --targetname iqn.2004-04.com.qnap:ts-231p:iscsi.nas.0a68db --portal 192.168.1.2 --login
+# fdisk -l
+# lsblk
+
+cfdisk /dev/sdb
+apt install drbd-utils
+vi /etc/drbd.d/urbackup.res
+resource urbackup {
+        on urbackup01 {
+                volume 0 {
+                        device /dev/drbd0;
+                        disk /dev/sdb1;
+                        meta-disk internal;
+                }
+                address 192.168.1.245:7789;
+        }
+}
+
+drbdadm create-md urbackup
+service drbd start
+drbdadm primary urbackup --force
+drbdadm status
+mkfs.btrfs /dev/drbd0
+
+
+------------
+BOOT
+iscsiadm --mode node --targetname iqn.2004-04.com.qnap:ts-231p:iscsi.nas.0a68db --portal 192.168.1.2 --login
+service drbd start
+drbdadm primary urbackup
+mount -o "noatime" /dev/drbd0 /media/BACKUP/urbackup/
+service urbackupsrv start
+
+
+Medlav
+mount -o "noatime" /dev/sda1 /media/BACKUP/urbackup/
+service urbackupsrv start

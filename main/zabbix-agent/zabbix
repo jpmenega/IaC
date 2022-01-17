@@ -1,0 +1,6 @@
+#zabbix
+Cmnd_Alias CMDS = /etc/zabbix/gluster-monitoring.pl*, /usr/sbin/crm_mon --as-xml, /usr/sbin/service *, /sbin/drbdadm, /etc/zabbix/scripts/*
+Defaults:zabbix !requiretty
+Defaults:zabbix !syslog
+
+zabbix ALL = NOPASSWD: CMDS

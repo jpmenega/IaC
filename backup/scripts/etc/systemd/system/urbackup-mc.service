@@ -1,0 +1,6 @@
+[Unit]
+After=urbackup-mc.service
+[Service]
+ExecStart=/etc/urbackup/startup.sh
+[Install]
+WantedBy=default.target

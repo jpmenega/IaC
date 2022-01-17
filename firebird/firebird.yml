@@ -1,0 +1,135 @@
+- hosts: active
+  become: yes
+  tasks:
+    #- name: Turn primary node as DRBD primary
+    #  shell: "drbdadm primary drbd"
+    #  when: lb_primary == "yes"
+    #  with_items: "{{ (lb_primary | default([])) }}"
+
+    - name: "Install unzip"
+      apt:
+       name: unzip
+       state: present
+       update_cache: true
+
+    - name: Download Firebird installation
+      get_url:
+        url: "{{ firebird_package_url }}"
+        dest: /root/
+
+    - name: Unarchive Firebird installation
+      unarchive:
+        src: "{{ firebird_package_name }}"
+        dest: /root
+        remote_src: yes
+
+    - name: "Install libncurses5"
+      apt:
+       name: libncurses5
+       state: present
+       update_cache: true
+
+    - name: Install Firebird
+      shell: "./install.sh -silent"
+      args:
+        chdir: "{{ firebird_package_folder }}"
+
+    - name: "Install gcc"
+      apt:
+       name: gcc
+       state: present
+       update_cache: true
+
+    - name: "Install libunac1-dev (unac.h)"
+      apt:
+       name: libunac1-dev
+       state: present
+       update_cache: true
+
+    - name: Download Firebird UDF lib
+      get_url:
+        url: "{{ firebird_lib_url }}"
+        dest: "{{ firebird_package_folder }}/"
+
+    - name: Compile tbudf.c ==> tbudf.o
+      shell: "gcc -Wall -c -O -fpic tbudf.c"
+      args:
+        chdir: "{{ firebird_package_folder }}"
+
+    - name: Link tbudf.o ==> tbudf.so
+      shell: "ld -G tbudf.o -lunac -lm -lc -o /opt/firebird/UDF/tbudf.so"
+      args:
+        chdir: "{{ firebird_package_folder }}"
+
+    - name: Kill fbguard
+      shell: "killall fbguard"
+
+    #- name: Kill fbserver
+    #  shell: "killall fbserver"
+
+    - name: Disable firebird service
+      service:
+        name: firebird.service
+        enabled: no
+
+    - name: Create Firebird data folder
+      file:
+        path: /opt/firebird/DB
+        state: directory
+
+    - name: Put nodes at stand by mode
+      shell: "crm node standby {{ inventory_hostname }} > firebird-lb-standby.txt"
+      args:
+        chdir: $HOME
+        creates: firebird-lb-standby.txt
+
+    - name: Download crm PostgreSQL script
+      shell: "wget {{ git_source }}/firebird/scripts/firebirdSVC"
+      args:
+        chdir: /usr/lib/ocf/resource.d/heartbeat
+        creates: /usr/lib/ocf/resource.d/heartbeat/firebirdSVC
+
+    - name: change Firebird script permission
+      file:
+        path: /usr/lib/ocf/resource.d/heartbeat/firebirdSVC
+        state: touch
+        mode: "u=rwx,g=rx,o=rx"
+
+    - name: "Configure Firebird volume - drbd_firebird_volume"
+      replace:
+        path: /usr/lib/ocf/resource.d/heartbeat/firebirdSVC
+        regexp: '<drbd_firebird_volume>'
+        replace: '{{ drbd_firebird_volume }}'
+
+    - name: Configure pacemaker Firebird VIP
+      shell: "crm configure primitive firebirdVIP ocf:heartbeat:IPaddr2 params ip=\"{{ cluster_vip_ip }}\" cidr_netmask=\"{{ cluster_vip_netmask }}\" nic=\"{{ cluster_vip_nic }}\" op monitor interval=\"10s\" meta migration-threshold=\"10\" > cluster-lb-vip.txt"
+      args:
+        chdir: $HOME
+        creates: cluster-lb-vip.txt
+      when: lb_primary == "yes"
+      with_items: "{{ lb_primary | default([]) }}"
+
+    - name: Configure pacemaker Firebird service
+      shell: "crm configure primitive firebirdSVC ocf:heartbeat:firebirdSVC params conffile=/etc/postgresql/11/main/postgresql.conf op monitor interval=10s timeout=60s op start timeout=180s interval=0 op stop timeout=180s interval=0 meta migration-threshold=10 > cluster-lb-service.txt"
+      args:
+       chdir: $HOME
+       creates: cluster-lb-service.txt
+      when: lb_primary == "yes"
+      with_items: "{{ lb_primary | default([]) }}"
+
+    - name: Configure pacemaker Firebird group
+      shell: "crm configure group grp_balancing firebirdVIP firebirdSVC > cluster-lb-group.txt"
+      args:
+       chdir: $HOME
+       creates: cluster-lb-group.txt
+      when: lb_primary == "yes"
+      with_items: "{{ (lb_primary | default([])) }}"
+
+    - name: Configure stickiness to avoid unnecessary move on recover
+      shell: "crm configure rsc_defaults resource-stickiness=100 > cluster-lb-stickiness.txt"
+      args:
+       chdir: $HOME
+       creates: cluster-lb-stickiness.txt
+      when: lb_primary == "yes"
+      with_items: "{{ (lb_primary | default([])) }}"
+

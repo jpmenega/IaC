@@ -1,0 +1,1 @@
+curl --ssl smtp://smtp.gmail.com:587 --mail-from medlav.automation2@gmail.com --mail-rcpt jpmenegatti@hotmail.com --upload-file email.txt --user 'medlav.automation2@gmail.com:<password>'

@@ -1,0 +1,215 @@
+#https://www.urbackup.org/administration_manual.html#x1-60002.1.2
+- hosts: active
+  become: yes
+  tasks:
+    - name: Add UrBackup repository - Ubuntu
+      apt_repository:
+        repo: 'ppa:uroni/urbackup'
+      when: ansible_distribution == 'Ubuntu'
+
+    - name: Download UrBackup package - Debian
+      get_url:
+        url: https://hndl.urbackup.org/Server/2.4.13/urbackup-server_2.4.13_amd64.deb
+        dest: /root
+      when: ansible_distribution == 'Debian'
+
+    - name: "Install nfs-common"
+      apt:
+       name: nfs-common
+       state: present
+       update_cache: true
+
+    - name: "Install cifs-utils"
+      apt:
+       name: cifs-utils
+       state: present
+       update_cache: true
+
+    - name: Install UrBackup - Ubuntu
+      command: apt-get install -y urbackup-server
+      environment:
+        DEBIAN_FRONTEND: noninteractive
+      when: ansible_distribution == 'Ubuntu'
+
+    - name: Install libcurl3-nss - Debian
+      apt:
+       name: libcurl3-nss
+       state: present
+       update_cache: true
+      when: ansible_distribution == 'Debian'
+
+    - name: Install sqlite3 - Debian
+      apt:
+       name: sqlite3
+       state: present
+       update_cache: true
+      when: ansible_distribution == 'Debian'
+
+    - name: Install qemu-utils - Debian
+      apt:
+       name: qemu-utils
+       state: present
+       update_cache: true
+      when: ansible_distribution == 'Debian'
+
+    - name: Install libnss3 - Debian
+      apt:
+       name: libnss3
+       state: present
+       update_cache: true
+      when: ansible_distribution == 'Debian'
+
+    - name: Install libguestfs-tools - Debian
+      apt:
+       name: libguestfs-tools
+       state: present
+       update_cache: true
+      when: ansible_distribution == 'Debian'
+
+    - name: Install libnspr4 - Debian
+      apt:
+       name: libnspr4
+       state: present
+       update_cache: true
+      when: ansible_distribution == 'Debian'
+
+    - name: Install UrBackup - Debian
+      command: "dpkg -i urbackup-server_2.4.13_amd64.deb"
+      environment:
+        DEBIAN_FRONTEND: noninteractive
+      args:
+        chdir: /root
+      when: ansible_distribution == 'Debian'
+
+    #- name: Install UrBackup dependencies - Debian
+    #  command: "apt install -f"
+    #  environment:
+    #    DEBIAN_FRONTEND: noninteractive
+    #  args:
+    #    chdir: /root
+    #  when: ansible_distribution == 'Debian'
+
+    - name: Stop urbackupsrv
+      service:
+        name: urbackupsrv.service
+        state: stopped
+
+    - name: Disable urbackupsrv
+      service:
+        name: urbackupsrv.service
+        enabled: no
+
+    #- name: Unmount NFS volume (if mounted)
+    #  mount:
+    #    path: /media/BACKUP/urbackup
+    #    state: unmounted
+
+    #- name: Delete /media/BACKUP/urbackup
+    #  file:
+    #    state: absent
+    #    path: /media/BACKUP/urbackup
+
+    #- name: Recreate /media/BACKUP/urbackup
+    #  file:
+    #    path: /media/BACKUP/urbackup
+    #    state: directory
+
+    #- name: Ensure we have share storage in /etc/fstab
+    #  lineinfile:
+    #    path: /etc/fstab
+    #    regexp: '^{{ backup_storage_share }}'
+    #    line: '{{ backup_storage_share }}   /media/BACKUP/urbackup  {{ backup_storage_mount_options }}'
+
+    #- name: Mount share volume
+    #  command: mount /media/BACKUP/urbackup
+
+    #- name: Restore UrBackup backup
+    #  command: cp /media/BACKUP/urbackup/urbackup/* /var/urbackup/
+
+    #- name: Start urbackupsrv
+    #  service:
+    #    name: urbackupsrv.service
+    #    state: started
+
+    - name: "Datastore: Install open-iscsi"
+      apt:
+       name: open-iscsi
+       state: present
+       update_cache: true
+
+    - name: "Datastore: Create startup service script - iSCSI"
+      copy:
+        dest: /etc/urbackup/startup.sh
+        mode: u=rwx,g=rx,o=r
+        owner: root
+        content: |
+            #!/bin/bash
+            iscsiadm --mode node --targetname {{ backup_storage_iscsi_iqn }} --portal {{ backup_storage_iscsi_server }} --login
+            sleep 10
+            mount -o "noatime" {{ backup_storage_iscsi_dev }} /media/BACKUP/urbackup/
+            service urbackupsrv start
+      when: storage_iscsi == 'yes'
+
+    - name: "Datastore: Create startup service script - no iSCSI"
+      copy:
+        dest: /etc/urbackup/startup.sh
+        mode: u=rwx,g=rx,o=r
+        owner: root
+        content: |
+            #!/bin/bash
+            mount -o "noatime" {{ backup_storage_iscsi_dev }} /media/BACKUP/urbackup/
+            service urbackupsrv start
+      when: storage_iscsi != 'yes'
+
+    - name: "Startup: Configure startup service"
+      copy:
+        dest: /etc/systemd/system/urbackup-mc.service
+        mode: u=rw,g=r,o=r
+        owner: root
+        content: |
+            [Unit]
+            After=urbackup-mc.service
+            [Service]
+            ExecStart=/etc/urbackup/startup.sh
+            [Install]
+            WantedBy=default.target
+    
+    - name: "Startup: Enable urbackup-mc"
+      systemd:
+        name: urbackup-mc.service
+        daemon_reload: yes
+        enabled: yes
+
+    - name: "Replica: Install progress view (pv)"
+      apt:
+       name: pv
+       state: present
+       update_cache: true
+
+    - name: "Replica: Install pbzip2"
+      apt:
+       name: pbzip2
+       state: present
+       update_cache: true
+
+    - name: "Replica: Download btrfs-sync script"
+      get_url:
+        url: "{{ git_source }}/backup/scripts/replica/usr/local/sbin/btrfs-sync"
+        dest: /usr/local/sbin
+
+    - name: "Replica: change btrfs-sync script permission"
+      file:
+        path: /usr/local/sbin/btrfs-sync
+        state: touch
+        mode: "u=rwx,g=r,o=r"
+
+    - name: "Replica: Download replica.sh script"
+      get_url:
+        url: "{{ git_source }}/backup/scripts/replica/usr/local/sbin/replica.sh"
+        dest: /usr/local/sbin
+
+    - name: "Replica: change replica.sh script permission"
+      file:
+        path: /usr/local/sbin/replica.sh
+        state: touch
+        mode: "u=rwx,g=r,o=r"

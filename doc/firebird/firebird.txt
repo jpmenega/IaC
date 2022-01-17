@@ -1,0 +1,47 @@
+wget https://github.com/FirebirdSQL/firebird/releases/download/v4.0.0/Firebird-4.0.0.2496-0.amd64.tar.gz
+
+https://github.com/FirebirdSQL/firebird/releases/download/R2_5_9/FirebirdSS-2.5.9.27139-0.amd64.tar.gz
+
+tar -xzvf Firebird-4.0.0.2496-0.amd64.tar.gz
+
+apt install libtommath1
+cd Firebird-4.0.0.2496-0.amd64/
+./install.sh -silent
+
+//disable firebird service
+
+cd ..
+rm -r -f Firebird-4.0.0.2496-0.amd64
+
+
+cat /opt/firebird/SYSDBA.password (get password)
+./gsec -user sysdba -pass <current_password> -mo sysdba -pw <new password>
+
+
+----------------
+vim.tiny /opt/firebird/firebird.conf
+WireCrypt = Disabled
+AuthServer = Legacy_Auth, Srp, Win_Sspi
+AuthClient = Legacy_Auth, Srp, Win_Sspi
+
+-------------------
+Backup
+./gbak -b -user SYSDBA -pas gbkuz03 localhost/3050:/data/opt/samba/banco/uz/siga.fdb /tmp/siga.fbk
+
+./gbak -b -user SYSDBA -pas gbkuz03 localhost/3050:/data/opt/samba/banco/uz/siga.fdb /tmp/siga.fbk
+./gbak -b -user SYSDBA -pas gbkuz03 localhost/3050:/data/opt/samba/banco/uz/dbsn.fdb /tmp/dbsn.fbk
+
+Restore
+./gbak -user SYSDBA -pas gbkuz03 -r -o /tmp/siga.fbk /opt/firebird/DB/UZ/siga.fdb
+./gbak -user SYSDBA -pas gbkuz03 -r -o /tmp/dbsn.fbk /opt/firebird/DB/UZ/dbsn.fdb
+
+UDF libs
+http://firebirdsql.org/en/writing-udfs-for-interbase/
+
+----------------
+/opt/firebird/bin/isql -u SYSDBA -p <password> /opt/firebird/DB/planeta/siga.fdb
+Exemplos de select UZ
+Select udf_nvl(P1PVEN) FROM P1;
+Select udf_rounddec(P1PVEN, 2) FROM P1;
+select udf_CollateBr(AJDESC) from AJ;
+Select P1PVEN FROM P1;

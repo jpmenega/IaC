@@ -1,0 +1,6 @@
+https://www.ibm.com/support/pages/slow-performance-and-frequent-disconnection-iscsi-lun-when-used-fastback-mount
+
+cat /proc/sys/net/ipv4/tcp_window_scaling 
+
+echo "# Disable TCP window scaling" >> sysctl.conf
+echo "net.ipv4.tcp_window_scaling=0" >> sysctl.conf

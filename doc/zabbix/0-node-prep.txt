@@ -1,0 +1,154 @@
+#Debian 11
+virt-install --virt-type=kvm --name zabbix01 --ram 2048 --vcpus=2 --os-variant=debian10 --cdrom=/var/lib/libvirt/boot/debian-11.1.0-amd64-DVD-1.iso --network=bridge=br0,model=virtio --graphic vnc --disk path=/var/lib/libvirt/images/zabbix01.qcow2,size=20,bus=virtio,format=qcow2 --disk path=/var/lib/libvirt/images/zabbix01-drbd.qcow2,size=20,bus=virtio,format=qcow2
+
+===========================
+sudo su
+passwd
+
+ip addr show
+netplan apply (se precisar reaplicar o DHCP)
+
+vi /etc/ssh/sshd_config (PermitRootLogin yes)
+service sshd restart
+
+**Acessar agora por SSH
+
+*se precisar setar IP e Hostname
+echo zabbix0? > /etc/hostname
+
+nano /etc/default/grub
+  GRUB_CMDLINE_LINUX="net.ifnames=0 biosdevname=0"
+
+grub-mkconfig -o /boot/grub/grub.cfg
+
+vi /etc/netplan/00-installer-config.yaml
+-----
+network:
+  ethernets:
+    eth0:
+      addresses:
+      - 192.168.1.x/24
+      gateway4: 192.168.1.1
+      nameservers:
+        addresses:
+        - 192.168.1.1
+        search:
+        - uz.com.br
+  version: 2
+-----
+#vim.tiny /etc/network/interfaces
+auto eth0
+iface eth0 inet static
+  address 192.168.15.19
+  netmask 255.255.255.0
+  gateway 192.168.15.1
+  dns-nameservers 192.168.15.1
+  mtu 9000
+
+#vim.tiny /etc/resolv.conf
+search medlav.intranet
+nameserver 192.168.15.1
+-----
+reboot
+netplan apply (nao funcionaria pois alteramos o nome da NIC no GRUB)
+
+--------------
+OLD apt install lvm2 drbd-utils
+apt install drbd-utils
+
+OLD cfdisk /dev/vdb
+OLD pvcreate /dev/vdb1
+OLD vgcreate vg_drbd /dev/vdb1 //vgdisplay
+OLD lvcreate -l 100%FREE -c 64k --thinpool tpool_drbd vg_drbd
+OLD lvs (para mostrar tamanho alocado e usar na linha abaixo)
+
+/etc/drbd.d/global_common.conf
+        startup {
+                wfc-timeout  15;
+                degr-wfc-timeout 60;
+        }
+        net {
+                cram-hmac-alg sha1;
+                shared-secret "secret";
+        }
+
+/etc/drbd.d/zabbix.res
+resource zabbix {
+        on zabbix01 {
+                volume 0 {
+                        device /dev/drbd0;
+                        disk /dev/vdb;
+                        meta-disk internal;
+                }
+                address 192.168.1.243:7788;
+        }
+        on zabbix02 {
+                volume 0 {
+                        device /dev/drbd0;
+                        disk /dev/vdb;
+                        meta-disk internal;
+                }
+                address 192.168.1.244:7788;
+        }
+}
+
+#ambos nodes
+drbdadm create-md zabbix
+service drbd start
+(debian)/lib/systemd/systemd-sysv-install enable drbd
+(ubuntu)systemctl enable drbd.service
+
+#node 1
+drbdadm primary zabbix --force
+
+#node 2
+drbdadm status
+watch -n1 cat /proc/drbd
+
+#node 1
+mkfs.ext4 -v /dev/drbd0
+drbdadm secondary zabbix
+
+#ambos nodes
+//systemctl disable corosync.service
+systemctl disable pacemaker.service
+
+-------
+#split brain
+na vitima:
+drbdadm disconnect drbd
+drbdadm secondary  drbd
+drbdadm connect  --discard-my-data   drbd
+
+no que vai assumir como principal:
+drbdadm disconnect drbd
+drbdadm connect drbd
+
+-------
+#zerar um node secundario para forcar um resync full
+drbdadm down drbd
+drbdadm wipe-md drbd
+drdbadm create-md drbd
+drbdadm up drbd
+-------
+
+-----
+https://linbit.com/drbd-user-guide/drbd-guide-9_0-en/
+9.3. Using automated LVM snapshots during DRBD synchronization
+MTU 9000
+------
+
+
+
+--------------
+
+*Primeiro node master e worker (necessario para copia das chaves do Corosync pela task de synchronize):
+ssh-keygen
+ssh-copy-id root@<demais_nodes_do_grupo_IP>
+
+reboot
+df -h
+
+=======================
+Know issue:
+zabbix nao consegue enviar msg para Slack: Precisa alterar o dominio do script da media de slack.com para slack.com. (isso ocorre por conta do ndots:5 inserido nos resolv.conf)

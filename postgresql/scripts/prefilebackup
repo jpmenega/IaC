@@ -1,0 +1,55 @@
+#!/bin/bash
+
+LOG_FILE=/var/log/backup.log
+DEST_DIR=/tmp/backuppostgres
+
+cd /tmp
+
+echo "$(date) Backup PostgreSQL databases - pre tasks" > $LOG_FILE
+rm -r -f $DEST_DIR
+mkdir -p $DEST_DIR
+chmod 777 $DEST_DIR
+
+echo "$(date) PostgreSQL version evidence" >> $LOG_FILE
+/usr/lib/postgresql/11/bin/postgres -V > $DEST_DIR/postgres-version.txt
+[ $? -eq 0 ]  || exit 1
+
+echo "$(date) Backup of YB008R" >> $LOG_FILE
+su postgres -c "pg_dump -U postgres -F c -b -v -f $DEST_DIR/YB008R.backup YB008R"
+[ $? -eq 0 ]  || exit 1
+su postgres -c "pg_dump -U postgres --format plain --encoding UTF8 --inserts --verbose --file $DEST_DIR/YB008R.sql YB008R"
+[ $? -eq 0 ]  || exit 1
+
+echo "$(date) Backup of YB019" >> $LOG_FILE
+su postgres -c "pg_dump -U postgres -F c -b -v -f $DEST_DIR/YB019.backup YB019"
+[ $? -eq 0 ]  || exit 1
+su postgres -c "pg_dump -U postgres --format plain --encoding UTF8 --inserts --verbose --file $DEST_DIR/YB019.sql YB019"
+[ $? -eq 0 ]  || exit 1
+
+echo "$(date) Backup of YB019FR" >> $LOG_FILE
+su postgres -c "pg_dump -U postgres -F c -b -v -f $DEST_DIR/YB019FR.backup YB019FR"
+[ $? -eq 0 ]  || exit 1
+su postgres -c "pg_dump -U postgres --format plain --encoding UTF8 --inserts --verbose --file $DEST_DIR/YB019FR.sql YB019FR"
+[ $? -eq 0 ]  || exit 1
+
+
+echo "$(date) Backup of destra" >> $LOG_FILE
+su postgres -c "pg_dump -U postgres -F c -b -v -f $DEST_DIR/destra.backup destra"
+[ $? -eq 0 ]  || exit 1
+su postgres -c "pg_dump -U postgres --format plain --encoding UTF8 --inserts --verbose --file $DEST_DIR/destra.sql destra"
+[ $? -eq 0 ]  || exit 1
+
+echo "$(date) Backup of yb_backup" >> $LOG_FILE
+su postgres -c "pg_dump -U postgres -F c -b -v -f $DEST_DIR/yb_backup.backup yb_backup"
+[ $? -eq 0 ]  || exit 1
+su postgres -c "pg_dump -U postgres --format plain --encoding UTF8 --inserts --verbose --file $DEST_DIR/yb_backup.sql yb_backup"
+[ $? -eq 0 ]  || exit 1
+
+echo "$(date) Backup of postgres" >> $LOG_FILE
+su postgres -c "pg_dump -U postgres -F c -b -v -f $DEST_DIR/postgres.backup postgres"
+[ $? -eq 0 ]  || exit 1
+su postgres -c "pg_dump -U postgres --format plain --encoding UTF8 --verbose --file $DEST_DIR/postgres.sql postgres"
+[ $? -eq 0 ]  || exit 1
+
+echo "$(date) Backup pre tasks done." >> $LOG_FILE
+exit 0

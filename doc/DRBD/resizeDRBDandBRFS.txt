@@ -1,0 +1,38 @@
+----------
+Hypervisor
+----------
+qemu-img info /var/lib/libvirt/images/samba-ad-dc01-drbd.qcow2
+qemu-img resize --preallocation=full /var/lib/libvirt/images/samba-ad-dc01-drbd.qcow2 +200G
+
+---
+VM
+---
+(precisa executar nas duas VMs os primeiro passos)
+lsblk (vdb1 ainda com tamanho antigo) 
+cfdisk /dev/vdb (resize/extend vdb1)
+lsblk (vdb1 com novo tamanho)
+
+service drbd start (ambos nodes)
+lsblk (drbd0 com tamanho antigo)
+
+
+(Daqui em diantes apenas e um dos nodes)
+drbdadm primary samba
+drbdadm resize samba (se apenas uma VM estiver ligada o resize nao acontece)
+  existe o comando abaixo mas usei o comando acima mesmo sem honerar tempo ou sync
+  (drbdadm -- --assume-clean resize samba)
+lsblk (drbd0 com novo tamanho)
+
+mount /dev/drbd0 /var/lib/samba/
+df -h (pasta montada com tamanho antigo)
+btrfs filesystem resize max /var/lib/samba/
+df -h (pasta montada com novo tamanho)
+umount /var/lib/samba/
+drbdadm secondary samba
+
+
+
+https://blog.voina.org/drbd-growing-online-a-replicated-resource-in-a-complex-enterprise-environment/
+
+https://rarforge.com/w/index.php/LVM%2BDRBD%2BLVM%2BKVM%2BLVM_Resize
+https://ogris.de/drbd/

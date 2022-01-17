@@ -1,0 +1,226 @@
+https://wiki.ipfire.org/addons/keepalived
+
+Obs.: Nao precisa criar criar regra de firewall para liberar o multicast (224.0.0.0/8) uma vez que faremos a configuracao unicast
+
+pakfire install keepalived
+mkdir /var/ipfire/keepalived
+
+-----------------------------------------------
+# cat /var/ipfire/keepalived/keepalived.conf
+global_defs {
+ router_id proxynode1
+ enable_script_security
+ script_user root
+}
+vrrp_script chk_VI {
+  script       "/var/ipfire/keepalived/chk_VI.sh"
+  interval 1   # check every 1 seconds
+  timeout 5
+  fall 3       # require 3 failures for KO
+  rise 3       # require 3 successes for OK
+}
+vrrp_instance VI_1 {
+  state MASTER
+  interface green0
+  virtual_router_id 81
+  priority 150  <============= 100 no BACKUP
+  advert_int 1
+  unicast_src_ip 192.168.20.10 <================ 192.168.20.1
+  unicast_peer {
+    192.168.20.1 <================ 192.168.20.10
+  }
+  authentication {
+#        auth_type PASS
+# AH 51/ip works encrypted
+      auth_type AH
+      auth_pass vrrp4lan
+      ! password length max 8 characters and its clear text
+  }
+  virtual_ipaddress {
+      192.168.20.11/24 brd 192.168.20.255 dev green0
+  }
+  track_script {
+    chk_VI
+  }
+  notify /var/ipfire/keepalived/vrrp_notify.sh  <============= somente se master
+}
+vrrp_instance VI_2 {
+  state BACKUP  <================ MASTER
+  interface green0
+  virtual_router_id 82
+  priority 100 <============= 150 no MASTER
+  advert_int 1
+  unicast_src_ip 192.168.20.10 <================ 192.168.20.1
+  unicast_peer {
+    192.168.20.1 <================ 192.168.20.10
+  }
+  authentication {
+#        auth_type PASS
+      auth_type AH
+      auth_pass vrrp4lan
+  }
+  virtual_ipaddress {
+      192.168.20.12/24 brd 192.168.20.255 dev green0
+  }
+  track_script {
+    chk_VI
+  }
+  notify /var/ipfire/keepalived/vrrp_notify.sh  <============= somente se master
+}
+
+----------------------------------------------------------------
+
+# cat /var/ipfire/keepalived/keepalived
+#!/bin/bash
+# start/stop script for ipfire's keepalived packet
+# (w) Cisco Bob 2013
+# History:
+# 22.Aug 2013 CB initial version
+
+DAEMON="/usr/sbin/keepalived"
+VRRP="--vrrp"
+CHECK="--check"
+CFGFILE="-f /var/ipfire/keepalived/keepalived.conf"
+#WDOG_VRRP="--wdog-vrrp 1" #not supported
+WDOG_CHECK="--wdog-check 30"
+DEFAULTS="/var/ipfire/keepalived/defaults"
+PIDFILE="/var/run/keepalived.pid"
+DEBUG=""
+
+daemonName=${DAEMON##*/}
+
+if [ -s $DEFAULTS ]
+then
+  . $DEFAULTS
+fi
+
+if [ ! -x $DAEMON ]
+then
+  echo "File $DAEMON is not executable - bailout"
+  exit 3
+fi
+
+if [ ! $CFGFILE ]
+then
+  echo "sorry configile $CFGFILE must exist - bailout"
+  exit 3
+fi
+
+function startProc () {
+  $DAEMON $DEBUG $VRRP $CHECK $CFGFILE $WDOG_VRRP $WDOG_CHECK
+    [ $? -eq 0 ] && echo "$!" >$PIDFILE
+}
+function stopProc () {
+    if [ -f $PIDFILE ]
+  then
+      kill $(cat $PIDFILE)
+      rm -f $PIDFILE
+  else
+      list=$(ps -ef | grep keepalived | grep -v grep)
+       if [ -z "$list" ]
+      then
+          # no process found - exit silently
+          exit 0
+      fi
+      pidOfDaemonRaw=$(ps -ef | grep $daemonName | awk '{ print $2 ","$3}')
+      # returns 1555,1 if it is the daemon
+        pidOfParent=${pidOfDaemonRaw#*,}
+        pidOfDaemon=${pidOfDaemonRaw%,*}
+        if [ "$pidOfParent" = "1" ]
+      then
+          #echo "OK - killing $DAEMON with PID=$pidOfDaemon"
+          kill $pidOfDaemon
+      fi
+  fi
+}
+
+if [ $# -lt 1 ]
+then
+  echo "usage: $0 start|stop|restart"
+  exit 3
+fi
+
+case $1 in
+  start)
+      startProc
+      ;;
+  stop)
+      stopProc
+      ;;
+  restart)
+      stopProc
+      sleep 1
+      startProc
+      ;;
+    *)
+      echo "unsupported paramter: $1 should be start,stop,restart"
+      ;;
+esac
+exit 0
+
+-----------------------------------------------------------------
+
+# cat /var/ipfire/keepalived/defaults
+# gets sourced by keepalived start/stop script
+DAEMON="/usr/sbin/keepalived"
+VRRP="--vrrp"
+#CHECK="--check"
+CHECK=""
+CFGFILE="-f /var/ipfire/keepalived/keepalived.conf"
+#WDOG_VRRP="--wdog-vrrp 1" #not supported
+#WDOG_CHECK="--wdog-check 30"
+WDOG_CHECK=""
+PIDFILE="/var/run/keepalived.pid"
+# for debugging set
+#DEBUG="--dont-fork --log-console --log-detail"
+#DEBUG="--log-detail"
+DEBUG=""
+
+-----------------------------------------------------------------
+
+# cat /var/ipfire/keepalived/helper
+#!/bin/bash
+set +u
+# setup for keepalived configuration
+# (w) Cisco Bob
+# History:
+# 22.Aug 2013 CB initial version
+#
+script="keepalived"
+cfg="/etc/$script/$script.conf"
+srcDir="/var/ipfire/$script"
+backupFile="/var/ipfire/backup/include"
+
+if [ -f $cfg ]
+then
+  mv $cfg ${cfg}.orig
+fi
+ln -sf $srcDir/${script}.conf $cfg
+ln -sf $srcDir/$script /etc/init.d/${script}
+ln -sf $srcDir/$script /etc/rc.d/rc3.d/S70${script}
+ln -sf $srcDir/$script /etc/rc.d/rc0.d/K01${script}
+ln -sf $srcDir/$script /etc/rc.d/rc6.d/K01${script}
+echo "links created"
+
+# now add it to the backup def file (multi call capable)
+# yes I know not very elegant :-( - but does the job
+echo "filter backupfile"
+grep -v $script $backupFile >/tmp/include
+echo "add keepalived to backup file"
+mv /tmp/include /var/ipfire/backup/include
+echo "/var/ipfire/${script}/*" >>/var/ipfire/backup/include
+echo "done"
+
+-----------------------------------------------------------------
+
+# cat /var/ipfire/keepalived/chk_VI.sh
+#!/bin/bash
+
+/usr/bin/ping -c 1 -W 1 8.8.8.8 > /dev/null 2>&1     <======== 208.67.220.222
+
+-----------------------------------------------------------------
+
+# cat vrrp_notify.sh
+#!/bin/bash
+[ "$3" != "MASTER" ] && echo down > /tmp/internetOutage.dat
+[ "$3" == "MASTER" ] && rm /tmp/internetOutage.dat -f

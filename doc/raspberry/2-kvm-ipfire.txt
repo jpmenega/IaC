@@ -1,0 +1,70 @@
+Hypervisor
+
+apt install sysstat
+apt install qemu-kvm libvirt-clients libvirt-daemon-system bridge-utils virtinst libvirt-daemon virt-manager libosinfo-bin libguestfs-tools -y
+
+cd /var/lib/libvirt/images
+#wget https://downloads.ipfire.org/releases/ipfire-2.x/2.25-core157/ipfire-2.25.2gb-ext4.aarch64-full-core157.img.xz
+#wget https://downloads.ipfire.org/releases/ipfire-2.x/2.27-core160/ipfire-2.27.2gb-ext4.aarch64-full-core160.img.xz
+wget https://downloads.ipfire.org/releases/ipfire-2.x/2.27-core161/ipfire-2.27.2gb-ext4.aarch64-full-core161.img.xz
+xz -d ipfire-2.27.2gb-ext4.aarch64-full-core161.img.xz
+
+virt-install --import --virt-type=kvm --name ipfire01 --ram 1024 --vcpus=1 --os-variant=debian10 --arch=aarch64 --network=bridge=br0,model=virtio --network=bridge=br1,model=virtio --network=bridge=br1,model=virtio --graphic vnc --disk path=/var/lib/libvirt/images/ipfire-2.27.2gb-ext4.aarch64-full-core161.img,bus=virtio,format=raw
+
+#virsh console ipfire01
+#virsh vncdisplay <Domain_VM_Name>
+VNC     #ssh root@192.168.16.5 -L 5900:127.0.0.1:5900
+
+#virsh undefine --nvram ipfire01
+
+Console https://<green_ip>:444/
+
+Manual IP configuration: 
+# vi /var/ipfire/ethernet/settings
+
+Package para instalar (Pakfire)
+ncat
+tcpdump
+telnet
+traceroute
+zabbit_agentd
+
+Iniciar a VM no startup do Raspberry
+#cat /etc/systemd/system/kvmStartVMs.service
+----------------------------
+[Unit]
+After=kvmStartVMs.service
+
+[Service]
+ExecStart=virsh start ipfire01
+
+[Install]
+WantedBy=default.target
+----------------------------
+
+#systemctl daemon-reload
+#systemctl enable kvmStartVMs.service
+
+************************
+Zabbix template (active)
+************************
+https://github.com/RobinR1/zbx-template-ipfire
+
+virsh console ipfire01
+
+cd /etc/zabbix_agentd/zabbix_agentd.d
+rm userparameter_pakfire.conf
+wget https://raw.githubusercontent.com/RobinR1/zbx-template-ipfire/master/zabbix_agentd.d/template_app_pakfire.conf
+wget https://raw.githubusercontent.com/RobinR1/zbx-template-ipfire/master/zabbix_agentd.d/template_module_ipfire_network_stats.conf
+wget https://raw.githubusercontent.com/RobinR1/zbx-template-ipfire/master/zabbix_agentd.d/template_module_ipfire_services.conf
+
+cd /etc/zabbix_agentd/scripts
+wget https://raw.githubusercontent.com/RobinR1/zbx-template-ipfire/master/scripts/ipfire_services.pl
+
+cd /etc/sudoers.u
+rm zabbix
+wget https://raw.githubusercontent.com/RobinR1/zbx-template-ipfire/master/sudoers.d/zabbix
+
+cd /etc/init.d
+./zabbix_agentd stop
+./zabbix_agentd start

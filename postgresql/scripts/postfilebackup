@@ -1,0 +1,13 @@
+#!/bin/bash
+
+LOG_FILE=/var/log/backup.log
+DEST_DIR=/tmp/backuppostgres
+
+cd /tmp
+
+echo "$(date) Backup done, performing cleanup" >> $LOG_FILE
+rm -r -f $DEST_DIR
+[ $? -eq 0 ]  || exit 1
+echo "$(date) Done" >> $LOG_FILE
+
+exit 0

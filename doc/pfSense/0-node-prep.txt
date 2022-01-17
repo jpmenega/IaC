@@ -1,0 +1,1 @@
+virt-install --virt-type=kvm --name pfSense02 --ram 1024 --vcpus=1 --os-variant=freebsd12.0 --cdrom=/var/lib/libvirt/boot/pfSense-CE-2.5.2-RELEASE-amd64.iso --network=bridge=br0,model=virtio --network=bridge=br1,model=virtio --graphic vnc --disk path=/var/lib/libvirt/images/pfSense02.qcow2,size=30,bus=virtio,format=qcow2

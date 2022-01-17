@@ -1,0 +1,46 @@
+============================
+Source script server pre req
+apt install ansible
+ssh-keygen
+ssh-copy-id root@<node_ip>
+============================
+Source script server
+mkdir ~/docker-cluster
+cd ~/docker-cluster
+
+nano hosts-postgresql (alterar IPs)
+
+ansible-playbook -i hosts-postgresql main/initial.yml
+ansible-playbook -i hosts-postgresql lb/loadbalancer.yml
+
+ansible-playbook -i hosts-postgresql postgresql/postgresql.yml
+
+BACKUP (precisa parar o cluster/banco pq o script vai subir o DRDB para copiar os arquivos)
+-cria servidor na console do UrBackup (Internet client/client behind NAT)
+-copia URL/script para instalacao (ainda nao instala)
+TF=`mktemp` && wget "http://10.214.157.23:55414/x?a=download_client&lang=en&clientid=1&authkey=irXaApwGXv&os=linux" -O $TF && sudo sh $TF; rm -f $TF
+-configura o schedule file backup (Default directories to backup: /tmp/backuppostgres/) etc na console
+-instala o client e para o servico
+service urbackupclientbackend stop
+
+ansible-playbook -i hosts-postgresql postgresql/backup-client.yml
+
+#Enable PostgreSQL backup (nao usado mais na Medlav)
+https://www.urbackup.org/backup_postgresql.html
+(Dump) On Linux with the binary client: Change 0 to 1 in /usr/local/etc/urbackup/postgresqldump.conf.
+
+APACHE
+apt update
+apt install apache2
+mv /var/www/html/ /var/www/html-old
+ln -s /mnt/postgresql/apache/html /var/www/html
+mv /usr/lib/cgi-bin /usr/lib/cgi-bin-old
+ln -s /mnt/postgresql/apache/cgi-bin/ /usr/lib/cgi-bin
+ln -s /etc/apache2/mods-available/cgi.load /etc/apache2/mods-enabled/cgi.load
+
+nano /etc/apache2/mods-enabled/mime.conf
+-localizar:
+AddHandler cgi-script .cgi
+alterar por
+-AddHandler cgi-script .cgi .fp
+

@@ -1,0 +1,1184 @@
+TBUDF - Tecnobyte UDF para FireBird
+======================================================================
+Autor....: Daniel Pereira Guimaraes
+E-mail...: tecnobyte@ulbrajp.com.br
+Home-Page: www.ulbrajp.com.br/~tecnobyte
+
+Esta biblioteca é Open-Source!
+
+Voce pode usar, alterar e copiar esta biblioteca para onde e quando
+quizer. Sua distribuicao é livre. Peço apenas que os créditos do autor
+sejam mantidos.
+
+Gostaria de receber suas críticas e sugestões. Envie seus comentários
+para o e-mail: tecnobyte@ulbrajp.com.br
+
+IMPORTANTE!
+
+Esta biblioteca foi testada com FireBird 1.0 usando dialeto 3.
+Algumas funções retornam dados do tipo int64, que no dialeto 3
+corresponde a NUMERIC(18,0). Como no dialeto 1 não existe suporte
+para int64, tais funções poderão apresentar problemas se forem
+usadas com dialeto 1.
+
+VOCÊ TAMBÉM PODE AJUDAR
+
+Você pode contribuir para que esta biblioteca possa ficar ainda
+melhor. Veja o que você pode fazer:
+
+- Testar as funções afim de encontrar possíveis bugs.
+- Sugerir alterações que possam melhorar a biblioteca.
+- Traduzir este manual para outros idiomas.
+- Se você sentir vontade de contribuir financeiramente, não deixe
+  a vontade passar!
+======================================================================
+
+Tabela de conteúdo:
+
+  1. Introdução
+  2. Histórico
+  3. Compilação
+  4. Instalação
+  5. Descrição e sintaxe das funções
+
+==========================================================================
+1. INTRODUÇÃO
+
+TBUDF é um conjunto de funções para serem usadas com FireBird 1.0
+ou compatível. Os testes foram realizados com:
+
+FireBird 1.0 (Windows/Linux)
+
+==========================================================================
+2. HISTÓRICO
+
+Versão 2.2
+
+  * Novas funções:
+
+      udf_Ver, udf_Stuff, udf_Repeat, udf_Age, udf_Age2, udf_IncDate,
+      udf_IncTime, udf_IncTS, udf_MaxDate, udf_MaxTime, udf_MinDate,
+      udf_MinTime, udf_Round, udf_RoundDec, udf_DZero, udf_Sign,
+      udf_Odd, udf_Sqr, udf_ACos, udf_ASin, udf_ATan, udf_GetBit,
+      udf_SetBit.
+
+  * Funções renomeadas:
+
+      udf_Length para udf_Len,
+      udf_DelChar para udf_Strip,
+      udf_Asc para udf_Ord,
+      udf_EncodeDate para udf_EncDate,
+      udf_EncodeTime para udf_EncTime,
+      udf_EncodeTimeStamp para udf_EncTS,
+      udf_DayOfWeek para udf_WeekDay,
+      udf_DayOfYear para udf_YearDay,
+      udf_MaxTime para udf_MaxTS,
+      udf_MinTime para udf_MinTS,
+      udf_Double para udf_NVL.
+
+  * Funções alteradas:
+
+      udf_WeekDay: Antes esta função retornava um número de 1 a 7.
+        Agora retorna um número de zero a 6. Com isto esta função
+        fica compatível com o comando EXTRACT.
+
+      udf_YearDay: Antes o primeiro dia do ano era 1. Agora o primeiro
+        dia do ano é zero. Com isto esta função fica compatível com
+        o comando EXTRACT.
+
+  * Bugs corrigidos:
+
+      - udf_TruncDec(x, n) truncava x para (n+1) casas.
+
+      - As funções udf_HourSpan, udf_MinuteSpan, udf_SecondSpan,
+        udf_HoursBetween, udf_MinutesBetween e udf_SecondsBetween
+        calculava errado quando a data/hora inicial fosse maior que
+        a data/hora final (T1 > T2).
+
+      - A declaração da função udf_IncYear estava incorreta.
+
+==========================================================================
+
+3. COMPILAÇÃO
+
+Para compilar a TBUDF basta executar os passos abaixo:
+
+a) Abra o projeto (arquivo tbudf.dpr) no Delphi ou Kylix.
+b) Execute o comando "Compile" ou "Build" do menu Project.
+
+IMPORTANTE!
+
+O arquivo compilado no Windows será "tbudf.dll" e no Linux deverá ser
+"libtbudf.so". No Linux o arquivo deverá ser renomeado para "tbudf.so"
+(em letras minúsculas).
+
+DICA - Para renomear o arquivo no linux digite:
+
+mv libtbudf.so tbudf.so
+
+==========================================================================
+
+4. INSTALAÇÃO
+
+No processo de compilação será obtido o arquivo tbudf.dll no Windows ou
+libtbudf.so no Linux. Siga os passos abaixo para fazer a instalação:
+
+a) Copie o arquivo tbudf.dll (Windows) ou tbudf.so (Linux) para o
+   sub-diretório UDF do FireBird.
+   
+b) Execute (no IBConsole ou similar) o script tbudf.sql.
+
+DICA!
+
+No pacote orignal seguem os arquivos tbudf.dll e tbudf.so que são,
+respectivamente, as versões compiladas da TBUDF para Windows e Linux. 
+==========================================================================
+
+5. DESCRIÇÃO E SINTAXE DAS FUNÇÕES
+
+A seguir será apresentada cada função da TBUDF, sua sintaxe e uma breve
+descrição do que a função faz. Em alguns casos serão apresentados
+exemplos.
+
+IMPORTANTE!
+
+A sintaxe será mostrada conforme o modelo abaixo:
+
+ Funcao(p1: tipo, p2: tipo,..., pN: tipo): tipo_retorno;
+
+ ou
+
+ Funcao(p1, p2,..., pN: tipo): tipo_retorno;
+
+ Onde:
+
+   p1..pN      : são os parâmetros da função.
+   tipo        : é o tipo de dado do parâmetro.
+   tipo_retorno: é o tipo de dado retornado pela função.
+
+OBSERVAÇÃO!
+
+Os tipos "string", "double" e "int64" citados neste manual correspondem,
+respectivamente, ao CHAR/VARCHAR, DOUBLE PRECISION e NUMERIC(18,0)
+do FireBird.
+
+----------------------------------------------------------------------
+udf_Ver
+
+  Sintaxe: udf_Ver: double;
+
+  Retorna o número de versão da TBUDF.
+----------------------------------------------------------------------
+udf_Len
+
+  Sintaxe: udf_Length(s: string): integer;
+
+  Retorna o comprimento (em caracteres) da string s.
+----------------------------------------------------------------------
+udf_Pos
+
+  Sintaxe: udf_Pos(s1, s2: string): integer;
+
+  Retorna a posição de s1 dentro de s2, ou zero se s1 não estiver
+  contida em s2.
+----------------------------------------------------------------------
+udf_Copy
+
+  Sintaxe: udf_Copy(s: string; x, y: integer): string;
+
+  Copia e retorna da string s a sub-string que inicia na posição x e
+  possui y caracteres.
+----------------------------------------------------------------------
+udf_Left
+
+  Sintaxe: udf_Left(s: string, x: integer): string;
+
+  Copia os primeiros x caracteres de s e retorna.
+----------------------------------------------------------------------
+udf_Right
+
+  Sintaxe: udf_Right(s: string, x: integer): string;
+
+  Copia os últimos x caracteres de s e retorna.
+----------------------------------------------------------------------
+udf_Replace
+
+  Sintaxe: udf_Replace(s, old, new: string): string;
+
+  Substitui na string s todas as ocorrências da string old
+  pela string new.
+
+  Exemplo:
+
+  udf_Replace('xxyxx', 'xx', 'z') retorna 'zyz'.
+----------------------------------------------------------------------
+udf_Stuff
+
+  Sintaxe: udf_Stuff(s1: string; i, j: integer; s2: string): string;
+
+  Retorna a string s1, substituindo-se a sub-string que inicia na
+  posição i, que possui tamanho j, pela string s2.
+
+  Exemplos:
+
+  udf_Stuff('Pereira', 2, 1, 'ar') retorna 'Parreira'
+  udf_Stuff('Pimenta', 2, 2, '') retorna 'Penta'
+  udf_Stuff('Penta', 2, 0, 'im') retorna 'Pimenta'
+----------------------------------------------------------------------
+udf_Strip
+
+  Sintaxe: udf_Strip(s, ch: string): string;
+
+  Excluir da string s todos os caracteres contidos na string ch.
+
+  Exemplo:
+
+  udf_Strip('FireBird', 'aeiou') retorna 'FrBrd'
+----------------------------------------------------------------------
+udf_Upper
+
+  Sintaxe: udf_Upper(s: string): string;
+
+  Retorna a string s convertida para maiúscula. Caracteres acentuados e
+  cedilha não são convertidos.
+----------------------------------------------------------------------
+udf_Lower
+
+  Sintaxe: udf_Lower(s: string): string;
+
+  Retorna a string s convertida para minúscula. Caracteres acentuados e
+  cedilha não são convertidos.
+----------------------------------------------------------------------
+udf_AnsiUpper
+
+  Sintaxe: udf_AnsiUpper(s: string): string;
+
+  Retorna a string s convertida para maiúscula. Caracteres acentuados e
+  cedilha são convertidos.
+----------------------------------------------------------------------
+udf_AnsiLower
+
+  Sintaxe: udf_AnsiLower(s: string): string;
+
+  Retorna a string s convertida para minúscula. Caracteres acentuados e
+  cedilha são convertidos.
+----------------------------------------------------------------------
+udf_StrOfChr
+
+  Sintaxe: udf_StrOfChr(s: string, x: integer): string;
+
+  Retorna uma string contendo x caracteres s[1], ou seja, replica x vezes
+  o primeiro caractere da string s e retorna.
+----------------------------------------------------------------------
+udf_Space
+
+  Sintaxe: udf_Space(x: integer): string;
+
+  Retorna uma string de x espaços (caractere ascii 32).
+----------------------------------------------------------------------
+udf_Repeat
+
+  Sintaxe: udf_Repeat(s: string; n: integer): string;
+
+  Retorna a string s repetida n vezes.
+----------------------------------------------------------------------
+udf_Digits
+
+  Sintaxe: udf_Digits(s: string): string;
+
+  Retorna uma string contendo apenas os dígitos numéricos (0 a 9) da
+  string s.
+
+  Exemplo:
+
+  udf_Digits('a1d5b25B6') retorna '15256'.
+----------------------------------------------------------------------
+udf_LTrim
+
+  Sintaxe: udf_LTrim(s: string): string;
+
+  Retorna a string s sem os espaços iniciais.
+----------------------------------------------------------------------
+udf_RTrim
+
+  Sintaxe: udf_RTrim(s: string): string;
+
+  Retorna a string s sem os espaços finais.
+----------------------------------------------------------------------
+udf_Trim
+
+  Sintaxe: udf_Trim(s: string): string;
+
+  Retorna a string s sem os espaços iniciais e finais.
+----------------------------------------------------------------------
+udf_PadL
+
+  Sintaxe: udf_PadL(s, pad: string; x: integer): string;
+
+  Retorna a string s preenchida à esquerda com a string pad até
+  completar x caracteres. Se pad for uma string nula, será retornada
+  a própria string s sem nenhum preenchimento.
+
+  Exemplo:
+
+  udf_PadL('25', '0', 6) retorna '000025'
+----------------------------------------------------------------------
+udf_PadR
+
+  Sintaxe: udf_PadR(s, pad: string; x: integer): string;
+
+  Retorna a string s preenchida à direita com a string pad até
+  completar x caracteres. Se pad for uma string nula, será retornada
+  a própria string s sem nenhum preenchimento.
+
+  Exemplo:
+
+  udf_PadR('Brasil', '.', 10) retorna 'Brasil....'
+----------------------------------------------------------------------
+udf_StrZero
+
+  Sintaxe: udf_StrZero(x, n: integer): string;
+
+  Retorna uma string contendo o número x preenchido com zeros à
+  esquerda até completar n caracteres.
+
+  Exemplos:
+
+  udf_StrZero(123, 5) retorna '00123'
+  udf_StrZero(50, 8) retorna '00000050'
+----------------------------------------------------------------------
+udf_Chr
+
+  Sintaxe: udf_Chr(x: smallint): string;
+
+  Retorna uma string contendo um caractere cujo código ascii é x.
+----------------------------------------------------------------------
+udf_Ord
+
+  Sintaxe: Ord_Ord(s: string): smallint;
+
+  Retorna a ordem do primeiro caractere da string s.
+----------------------------------------------------------------------
+udf_IsLower
+
+  Sintaxe: udf_IsLower(ch: string): smallint;
+
+  Retorna 1 caso o primeiro caractere de ch esteja entre 'a' e 'z'.
+  Caso contrário retorna 0 (zero).
+----------------------------------------------------------------------
+udf_IsUpper
+
+  Sintaxe: udf_IsUpper(ch: string): smallint;
+
+  Retorna 1 caso o primeiro caractere de ch esteja entre 'A' e 'Z'.
+  Caso contrário retorna 0 (zero).
+----------------------------------------------------------------------
+udf_IsDigit
+
+  Sintaxe: udf_IsDigit(ch: string): smallint;
+
+  Retorna 1 caso o primeiro caractere de ch esteja entre '0' e '9'
+  (zero e nove). Caso contrário retorna 0 (zero).
+----------------------------------------------------------------------
+udf_IsAlpha
+
+  Sintaxe: udf_IsAlpha(ch: string): smallint;
+
+  Retorna 1 caso o primeiro caractere de ch esteja entre 'A' e 'Z' ou
+  entre 'a' e 'z'. Caso contrário retorna 0 (zero).
+----------------------------------------------------------------------
+udf_CollateBr
+
+  Sintaxe: udf_CollateBr(s: string): string;
+
+  Troca os caracteres acentuados por não acentuados e cedilha por C e
+  converte tudo para maiúsculo. Esta função é útil para se fazer
+  pesquisas.
+
+  Exemplo:
+
+  select codigo, nome from tabela
+  where udf_CollateBr(Nome) = 'JOAO'
+
+  Esta consulta retorna os registros com todas as variações do nome
+  JOAO. Exemplos: joao, joão, João, Joao, JOÃO, JOAO, etc.
+----------------------------------------------------------------------
+udf_IntToHex
+
+  Sintaxe: udf_IntToHex(x: integer): string;
+
+  Converte o número decimal x para a base hexadecimal.
+----------------------------------------------------------------------
+udf_HexToInt
+
+  Sintaxe: udf_HexToInt(s: string): integer;
+
+  Converte o número hexadecimal contido na variável s para a base
+  decimal.
+----------------------------------------------------------------------
+udf_Year
+
+  Sintaxe: udf_Year(d: timestamp): smallint;
+
+  Retorna o ano da data d.
+----------------------------------------------------------------------
+udf_Month
+
+  Sintaxe: udf_Month(d: timestamp): smallint;
+
+  Retorna o mês da data d.
+----------------------------------------------------------------------
+udf_Day
+
+  Sintaxe: udf_Day(d: timestamp): smallint;
+
+  Retorna o dia do mês da data d.
+----------------------------------------------------------------------
+udf_Hour
+
+  Sintaxe: udf_Hour(t: timestamp): smallint;
+
+  Retorna a hora do horário t.
+----------------------------------------------------------------------
+udf_Minute
+
+  Sintaxe: udf_Minute(t: timestamp): smallint;
+
+  Retorna os minutos do horário t.
+----------------------------------------------------------------------
+udf_Second
+
+  Sintaxe: udf_Second(t: timestamp): smallint;
+
+  Retorna os segundos do horário t.
+----------------------------------------------------------------------
+udf_EncDate
+
+  Sintaxe: udf_EncDate(a, m, d: smallint): timestamp;
+
+  Codifica a data a partir do ano, mês e dia (a, m, d) informados.
+
+  Exemplo:
+
+  udf_EncDate(2002, 6, 27) retorna a data '27/06/2002'.
+----------------------------------------------------------------------
+udf_EncTime
+
+  Sintaxe: udf_EncTime(h, m, s: smallInt): timestamp;
+
+  Codifica o horário a partir da hora, minuto e segundo (h, m, s)
+  informados.
+
+  Exemplo:
+
+  udf_EncTime(11, 4, 30) retorna o horário '11:04:30'.
+----------------------------------------------------------------------
+udf_EncTS
+
+  Sintaxe: udf_EncTS(a, m, d, hora, min, seg: smallint): timestamp;
+
+  Codifica a data e hora do ano, mês, dia, hora, minuto e segundo
+  (a, m, d, hora, min, seg) informados.
+
+  Exemplo:
+
+  udf_EncTS(2002, 6, 27, 11, 04, 30)
+  retorna a data/hora '27/06/2002 11:04:30'
+----------------------------------------------------------------------
+udf_YearSpan
+
+  Sintaxe: udf_YearSpan(t1, t2: timestamp): double;
+
+  Retorna a diferença, em anos (aproximada), entre t1 e t2.
+----------------------------------------------------------------------
+udf_MonthSpan
+
+  Sintaxe: udf_MonthSpan(t1, t2: timestamp): double;
+
+  Retorna a diferença, em meses (aproximada), entre t1 e t2.
+----------------------------------------------------------------------
+udf_WeekSpan
+
+  Sintaxe: udf_WeekSpan(t1, t2: timestamp): double;
+
+  Retorna a diferença, em semanas, entre t1 e t2.
+----------------------------------------------------------------------
+udf_DaySpan
+
+  Sintaxe: udf_DaySpan(t1, t2: timestamp): double;
+
+  Retorna a diferença, em dias, entre t1 e t2.
+
+  Exemplo:
+
+  Considerando t1 igual a ontem às 18:00 e t2 igual a hoje às 12:00,
+  udf_DaySpan(t1, t2) retorna 0.75.
+----------------------------------------------------------------------
+udf_HourSpan
+
+  Sintaxe: udf_HourSpan(t1, t2: timestamp): double;
+
+  Retorna a diferença, em horas, entre t1 e t2.
+----------------------------------------------------------------------
+udf_MinuteSpan
+
+  Sintaxe: udf_MinuteSpan(t1, t2: timestamp): double;
+
+  Retorna a diferença, em minutos, entre t1 e t2.
+----------------------------------------------------------------------
+udf_SecondSpan
+
+  Sintaxe: udf_SecondSpan(t1, t2: timestamp): double;
+
+  Retorna a diferença, em segundos, entre t1 e t2.
+----------------------------------------------------------------------
+udf_YearsBetween
+
+  Sintaxe: udf_YearsBetween(t1, t2: timestamp): int64;
+
+  Retorna o número de anos (aproximado) decorridos entre t1 e t2.
+----------------------------------------------------------------------
+udf_MonthsBetween
+
+  Sintaxe: udf_MonthsBetween(t1, t2: timestamp): int64;
+
+  Retorna o número de meses (aproximado) decorridos entre t1 e t2.
+----------------------------------------------------------------------
+udf_WeeksBetween
+
+  Sintaxe: udf_WeeksBetween(t1, t2: timestamp): int64;
+
+  Retorna o número de semanas decorridas entre t1 e t2.
+----------------------------------------------------------------------
+udf_DaysBetween
+
+  Sintaxe: udf_DaysBetween(t1, t2: timestamp): int64;
+
+  Retorna o número de dias decorridos entre t1 e t2.
+----------------------------------------------------------------------
+udf_HoursBetween
+
+  Sintaxe: udf_HoursBetween(t1, t2: timestamp): int64;
+
+  Retorna o número de horas decorridas entre t1 e t2.
+----------------------------------------------------------------------
+udf_MinutesBetween
+
+  Sintaxe: udf_MinutesBetween(t1, t2: timestamp): int64;
+
+  Retorna o número de minutos decorridos entre t1 e t2.
+----------------------------------------------------------------------
+udf_SecondsBetween
+
+  Sintaxe: udf_SecondsBetween(t1, t2: timestamp): int64;
+
+  Retorna o número de segundos decorridos entre t1 e t2.
+----------------------------------------------------------------------
+udf_Age
+
+  Sintaxe: udf_Age(nascimento: timestamp): integer;
+
+  Retorna a idade (em anos completos) calculada a partir
+  da data de nascimento passada como parâmetro.
+----------------------------------------------------------------------
+udf_Age2
+
+  Sintaxe: udf_Age2(nascimento, hoje: timestamp): integer;
+
+  Retorna a idade (em anos completos) calculada a partir da data
+  de nascimento até a data "hoje" passada como parâmetro.
+----------------------------------------------------------------------
+udf_IncYear
+
+  Sintaxe: udf_IncYear(t: timestamp; x: integer): timestamp;
+
+  Retorna a data/hora t incrementada de x anos.
+
+  Exemplo:
+
+  Considerando t = '27/06/2002',
+  udf_IncYear(t, 1) retorna '27/06/2003'.
+----------------------------------------------------------------------
+udf_IncMonth
+
+  Sintaxe: udf_IncMonth(t: timestamp; x: integer): timestamp;
+
+  Retorna a data/hora t incrementada de x meses.
+
+  Exemplo:
+
+  Considerando t = '27/06/2002',
+  udf_IncMonth(t, 2) retorna '27/08/2002'.
+----------------------------------------------------------------------
+udf_IncWeek
+
+  Sintaxe: udf_IncWeek(t: timestamp; x: integer): timestamp;
+
+  Retorna data/hora t incrementada de x semanas.
+----------------------------------------------------------------------
+udf_IncDay
+
+  Sintaxe: udf_IncDay(t: timestamp; x: integer): timestamp;
+
+  Retorna a data/hora t incrementada de x dias.
+----------------------------------------------------------------------
+udf_IncHour
+
+  Sintaxe: udf_IncHour(t: timestamp; x: integer): timestamp;
+
+  Retorna a data/hora t incrementada de x horas.
+----------------------------------------------------------------------
+udf_IncMinute
+
+  Sintaxe: udf_IncMinute(t: timestamp; x: integer): timestamp;
+
+  Retorna a data/hora t incrementada de x minutos.
+----------------------------------------------------------------------
+udf_IncSecond
+
+  Sintaxe: udf_IncSecond(t: timestamp; x: integer): timestamp;
+
+  Retorna a data/hora t incrementada de x segundos.
+----------------------------------------------------------------------
+udf_IncDate
+
+  Sintaxe: udf_IncDate(t: timestamp; a, m, d: integer): timestamp;
+
+  Incrementa ano, mês e dia simultaneamente na data/hora t. Esta
+  função é equivalente às funções udf_IncYear, udf_IncMonth e
+  udf_IncDay.
+----------------------------------------------------------------------
+udf_IncTime
+
+  Sintaxe: udf_IncTime(t: timestamp; h, m, s: integer): timestamp;
+
+  Incrementa hora, minuto e segundo simultaneamente na data/hora t.
+  Esta função é equivalente às funções udf_IncHour, udf_IncMinute e
+  udf_IncSecond.
+----------------------------------------------------------------------
+udf_IncTS
+
+  Sintaxe: udf_IncTS(t: timestamp; a, m, d, h, min, s: integer): timestamp;
+
+  Incrementa ano, mês, dia, hora, minuto e segundo simultaneamente na
+  data/hora t. Esta função é equivalente às funções udf_IncDate e
+  udf_IncTime.
+----------------------------------------------------------------------
+udf_MaxDate
+
+  Sintaxe: udf_MaxDate(t1, t2: timestamp): timestamp;
+
+  Retorna t1 se a data de t1 for maior que a data de t2. Caso
+  contrário retorna t2.
+----------------------------------------------------------------------
+udf_MaxTime
+
+  Sintaxe: udf_MaxTime(t1, t2: timestamp): timestamp;
+
+  Retorna t1 se a hora de t1 for maior que a hora de t2. Caso
+  contrário retorna t2.
+----------------------------------------------------------------------
+udf_MaxTS
+
+  Sintaxe: udf_MaxTS(t1, t2: timestamp): timestamp;
+
+  Retorna t1 se t1 > t2. Caso contrário retorna t2.
+----------------------------------------------------------------------
+udf_MinDate
+
+  Sintaxe: udf_MinDate(t1, t2: timestamp): timestamp;
+
+  Retorna t1 se a data de t1 for menor que a data de t2. Caso
+  contrário retorna t2.
+----------------------------------------------------------------------
+udf_MinTime
+
+  Sintaxe: udf_MinTime(t1, t2: timestamp): timestamp;
+
+  Retorna t1 se a hora de t1 for menor que a hora de t2. Caso
+  contrário retorna t2.
+----------------------------------------------------------------------
+udf_MinTS
+
+  Sintaxe: udf_MinTS(t1, t2: timestamp): timestamp;
+
+  Retorna t1 se t1 < t2. Caso contrário retorna t2.
+----------------------------------------------------------------------
+udf_MonthStart
+
+  Sintaxe: udf_MonthStart(ano, mes: smallint): date;
+
+  Retorna a data do primeiro dia do mês e ano informados.
+
+  Exemplo:
+
+  udf_MonthStart(2002, 6) retorna '01/06/2002'.
+----------------------------------------------------------------------
+udf_MonthEnd
+
+  Sintaxe: udf_MonthEnd(ano, mes: smallint): date;
+
+  Retorna a data do último dia do mês e ano informados.
+
+  Exemplo:
+
+  udf_MonthEnd(2002, 6) retorna '30/06/2002'.
+----------------------------------------------------------------------
+udf_LastDay
+
+  Sintaxe: udf_LastDay(ano, mes: smallint): smallint;
+
+  Retorna o último dia do mês e ano especificados.
+
+  Exemplo:
+
+  udf_LastDay(2000, 2) retorna 29.
+----------------------------------------------------------------------
+udf_DayFrac
+
+  Sintaxe: udf_DayFrac(t: timestamp): double;
+
+  Retorna a fração decorrida do dia de t. O resultado é um número
+  real compreendido no intervalo [0,1), onde:
+  0.25 = 06:00:00
+  0.5  = 12:00:00 (meio dia)
+  0.75 = 18:00:00
+----------------------------------------------------------------------
+udf_YearDay
+
+  Sintaxe: udf_YearDay(t: timestamp): smallint;
+
+  Retorna o número do dia do ano da data t, sendo zero o primeiro dia
+  do ano.
+----------------------------------------------------------------------
+udf_WeekDay
+
+  Sintaxe: udf_WeekDay(t: timestamp): smallint;
+
+  Retorna o número do dia da semana da data t, onde 0 = domingo e
+  6 = sábado.
+----------------------------------------------------------------------
+udf_MonthName
+
+  Sintaxe: udf_MonthName(t: timestamp): string;
+
+  Retorna o nome do mês da data t.
+----------------------------------------------------------------------
+udf_SMonthName
+
+  Sintaxe: udf_SMonthName(t: timestamp): string;
+
+  Retorna o nome abreviado do mês da data t.
+----------------------------------------------------------------------
+udf_DayName
+
+  Sintaxe: udf_DayName(t: timestamp): string;
+
+  Retorna o nome do dia da semana da data t.
+----------------------------------------------------------------------
+udf_SDayName
+
+  Sintaxe: udf_SDayName(t: timestamp): string;
+
+  Retorna o nome abreviado do dia da semana da data t.
+----------------------------------------------------------------------
+udf_NVL
+
+  Sintaxe: udf_NVL(x: double): double;
+
+  Retorna zero caso x seja nulo. Caso contrário retorna o próprio
+  valor do x.
+----------------------------------------------------------------------
+udf_Frac
+
+  Sintaxe: udf_Frac(x: double): double;
+
+  Retorna a parte fracionária de x.
+
+  Exemplo:
+
+  udf_Frac(3.45) retorna 0.45.
+----------------------------------------------------------------------
+udf_Int
+
+  Sintaxe: udf_Int(x: double): double;
+
+  Retorna a parte inteiro de x (como double).
+
+  Exemplo:
+
+  udf_Int(3.45) retorna 3.0.
+----------------------------------------------------------------------
+udf_Trunc
+
+  Sintaxe: udf_Trunc(x: double): integer;
+
+  Retorna a parte inteira de x como um integer.
+
+  Exemplo:
+
+  udf_Trunc(3.45) retorna 3.
+----------------------------------------------------------------------
+udf_TruncDec
+
+  Sintaxe: udf_TruncDec(x: double; n: smallint): double;
+
+  Retorna o valor de x truncado para n casas após o ponto decimal.
+
+  Exemplo:
+
+  udf_TruncDec(3.4567, 2) retorna 3.45.
+----------------------------------------------------------------------
+udf_Round
+
+  Sintaxe: udf_Round(x: double): integer;
+
+  Arredonda o valor de x para um número inteiro. O arredondamento
+  feito por esta função é o mesmo feito pelo FireBird e calculadoras
+  financeiras.
+
+  Exemplos:
+
+  udf_Round(1.4) retorna 1
+  udf_Round(1.5) retorna 2
+  udf_Round(-1.5) retorna -2
+  udf_Round(2.6) retorna 3
+----------------------------------------------------------------------
+udf_RoundDec
+
+  Sintaxe: udf_RoundDec(x: double; n: smallint): double;
+
+  Retorna o número x arredondado para n casas após o ponto decimal.
+
+  Exemplos:
+
+  udf_RoundDec(2.3333, 2) retorna 2.33
+  udf_RoundDec(2.335, 2) retorna 2.34
+  udf_RoundDec(5.461, 1) retorna 5.5
+  udf_RoundDec(-2.335, 2) retorna -2.34
+----------------------------------------------------------------------
+udf_Ceil
+
+  Sintaxe: udf_Ceil(x: double): integer;
+
+  Retorna o menor inteiro maior ou igual a x.
+
+  Exemplos:
+
+  udf_Ceil(3.45) retorna 4.
+  udf_Ceil(-3.45) retorna -3.
+----------------------------------------------------------------------
+udf_Floor
+
+  Sintaxe: udf_Floor(x: double): integer;
+
+  Retorna o maior inteiro menor ou igual a x.
+
+  Exemplos:
+
+  udf_Floor(3.45) retorna 3.
+  udf_Floor(-3.45) retorna -4.
+----------------------------------------------------------------------
+udf_Max
+
+  Sintaxe: udf_Max(x, y: double): double;
+
+  Retorna o maior valor (x ou y).
+
+  Exemplo:
+
+  udf_Max(2,5) retorna 5.
+----------------------------------------------------------------------
+udf_Min
+
+  Sintaxe: udf_Min(x, y: double): double;
+
+  Retorna o menor valor (x ou y).
+
+  Exemplo:
+
+  udf_Min(2, 5) retorna 2.
+----------------------------------------------------------------------
+udf_Abs
+
+  Sintaxe: udf_Abs(x: double): double;
+
+  Retorna o valor absoluto (sem sinal) de x, ou seja |x|.
+
+  Exemplos:
+
+  udf_Abs(2) retorna 2.
+  udf_Abs(-2) retorna 2.
+----------------------------------------------------------------------
+udf_Sign
+
+  Sintaxe: udf_Sign(x: double): smallint;
+
+  Retorna
+    -1 se x < 0
+     0 se x = 0
+     1 se x > 0
+----------------------------------------------------------------------
+udf_Odd
+
+  Sintaxe: udf_Odd(x: integer): smallint;
+
+  Retorna 1 se x for ímpar. Caso contrário retorna zero.
+----------------------------------------------------------------------
+udf_Div
+
+  Sintaxe: udf_Div(x, y: integer): integer;
+
+  Retorna o resultado da divisão inteira de x por y.
+
+  Exemplo:
+
+  udf_Div(7,2) retorna 3.
+----------------------------------------------------------------------
+udf_Mod
+
+  Sintaxe: udf_Mod(x, y: integer): integer;
+
+  Retorna o resto da divisão de x por y.
+
+  Exemplo:
+
+  udf_Mod(15, 6) retorna 3.
+----------------------------------------------------------------------
+udf_DZero
+
+  Sintaxe: udf_DZero(x, y, z: double): double;
+
+  Se y <> 0, retorna x / y. Caso y = 0, retorna z.
+
+  Exemplos:
+
+  udf_DZero(8, 2, 3) retorna 4
+  udf_DZero(8, 0, 3) retorna 3
+----------------------------------------------------------------------
+udf_Exp
+
+  Sintaxe: udf_Exp(x: double): double;
+
+  Retorna o valor de "e" elevado a potência de x, onde "e" é a base
+  dos logaritmos naturais.
+----------------------------------------------------------------------
+udf_Factorial
+
+  Sintaxe: udf_Factorial(x: integer): int64;
+
+  Retorna o fatorial de x (x!).
+
+  Exemplo:
+
+  udf_Factorial(6) retorna 720.
+----------------------------------------------------------------------
+udf_Sqr
+
+  Sintaxe: udf_Sqr(x: double): double;
+
+  Retorna o quadrado de x, ou seja, x * x.
+
+  Exemplos:
+
+  udf_Sqr(3) retorna 9.
+  udf_Sqr(4) retorna 16.
+----------------------------------------------------------------------
+udf_Sqrt
+
+  Sintaxe: udf_Sqrt(x: double): double;
+
+  Retorna a raiz quadrada de x.
+----------------------------------------------------------------------
+udf_Power
+
+  Sintaxe: udf_Power(b, e: double): double;
+
+  Retorna a potência de base b e expoente e (b^e).
+
+  Exemplo:
+
+  udf_Power(3, 2) retorna 9.
+----------------------------------------------------------------------
+udf_LnXP1
+
+  Sintaxe: udf_LnXP1(x: double): double;
+
+  Retorna o logarítmo natual de (x+1).
+----------------------------------------------------------------------
+udf_Log10
+
+  Sintaxe: udf_Log10(x: double): double;
+
+  Retorna o logarítmo de x na base 10.
+----------------------------------------------------------------------
+udf_Log2
+
+  Sintaxe: udf_Log2(x: double): double;
+
+  Retorna o logarítmo de x na base 2.
+----------------------------------------------------------------------
+udf_LogN
+
+  Sintaxe: udf_LogN(b, x: double): double;
+
+  Retorna o logarítmo de x na base b.
+----------------------------------------------------------------------
+udf_Rand
+
+  Sintaxe: udf_Rand: double;
+
+  Retorna um número real aleatório x, tal que 0 <= x < 1.
+----------------------------------------------------------------------
+udf_RandInt
+
+  Sintaxe: udf_RandInt(x, y: integer): integer;
+
+  Retorna um número inteiro aleatório z, tal que x <= z <= y ou
+  y <= z <= x.
+----------------------------------------------------------------------
+udf_Pi
+
+  Sintaxe: udf_Pi: double;
+
+  Retorna o valor de Pi (3,14159265358979).
+----------------------------------------------------------------------
+udf_DegToRad
+
+  Sintaxe: udf_DegToRad(x: double): double;
+
+  Converte graus para radianos.
+----------------------------------------------------------------------
+udf_RadToDeg
+
+  Sintaxe: udf_RadToDeg(x: double): double;
+
+  Converte radianos para graus.
+----------------------------------------------------------------------
+udf_Cos
+
+  Sintaxe: udf_Cos(x: double): double;
+
+  Retorna o cosseno do ângulo x (x é o ângulo em radianos).
+----------------------------------------------------------------------
+udf_Sin
+
+  Sintaxe: udf_Sin(x: double): double;
+
+  Retorna o seno do ângulo x (x é o ângulo em radianos).
+----------------------------------------------------------------------
+udf_Tan
+
+  Sintaxe: udf_Tan(x: double): double;
+
+  Retorna a tangente do ângulo x (x é o ângulo em radianos).
+----------------------------------------------------------------------
+udf_CoTan
+
+  Sintaxe: udf_CoTan(x: double): double;
+
+  Retorna a co-tangente do ângulo x (x é o ângulo em radianos).
+----------------------------------------------------------------------
+udf_ACos
+
+  Sintaxe: udf_ACos(x: double): double;
+
+  Retorna a medida do arco cujo cosseno é x.
+----------------------------------------------------------------------
+udf_ASin
+
+  Sintaxe: udf_ASin(x: double): double;
+
+  Retorna a medida do arco cujo seno é x.
+----------------------------------------------------------------------
+udf_ATan
+
+  Sintaxe: udf_ATan(x: double): double;
+
+  Retorna a medida do arco cuja tangente é x.
+----------------------------------------------------------------------
+udf_Hypot
+
+  Sintaxe: udf_Hypot(x, y: double): double;
+
+  Retorna a medida da hipotenusa cujos catetos medem x e y.
+
+  Exemplo:
+
+  udf_Hypot(6, 8) retorna 10.
+----------------------------------------------------------------------
+udf_Not
+
+  Sintaxe: udf_Not(x: integer): integer;
+
+  Retorna o resultado da operação binária: not x. Isto é,
+  o valor de x com todos os bits invertidos.
+----------------------------------------------------------------------
+udf_And
+
+  Sintaxe: udf_And(x, y: integer): integer;
+
+  Retorna o resultado da operação binária: x and y.
+----------------------------------------------------------------------
+udf_Or
+
+  Sintaxe: udf_Or(x, y: integer): integer;
+
+  Retorna o resultado da operação binária: x or y.
+----------------------------------------------------------------------
+udf_Xor
+
+  Sintaxe: udf_Xor(x, y: integer): integer;
+
+  Retorna o resultado da operação binária: x xor y.
+----------------------------------------------------------------------
+udf_ShL
+
+  Sintaxe: udf_ShL(x, y: integer): integer;
+
+  Retorna o valor de x com todos os bits deslocados y posições
+  para a esquerda.
+----------------------------------------------------------------------
+udf_ShR
+
+  Sintaxe: udf_ShR(x, y: integer): integer;
+
+  Retorna o valor de x com todos os bits deslocados y posições
+  para a direita.
+----------------------------------------------------------------------
+udf_GetBit
+
+  Sintaxe: udf_GetBit(x: integer; p: smallInt): integer;
+
+  Retorna 1 se o bit da posição p estiver ligado. Caso contrário
+  retorna zero.
+
+  Exemplos:
+
+  udf_GetBit(28, 0) retorna zero
+  udf_GetBit(28, 1) retorna zero
+  udf_GetBit(28, 2) retorna 1
+  udf_GetBit(28, 3) retorna 1
+  udf_GetBit(28, 4) retorna 1
+
+  Dica: o valor de 28 em binário é 11100 e a posição do bit é
+  calculada da direita para esquerda, começando em zero.
+----------------------------------------------------------------------
+udf_SetBit
+
+  Sintaxe: udf_SetBit(x: integer; p, v: smallint): integer;
+
+  Se v = 0, retorna x com o bit da posição p desligado. Caso contrário
+  retorna x com o bit da posição p ligado.
+
+  Exemplos:
+
+  udf_SetBit(28, 0, 1) retorna 29
+  udf_SetBit(28, 1, 1) retorna 30
+  udf_SetBit(28, 4, 0) retorna 12
+
+  Dica: os valores binários de 28, 29, 30 e 12 são 11100, 11101, 11110
+  e 1100 respectivamente.
+----------------------------------------------------------------------
+Fim do manual
+----------------------------------------------------------------------
