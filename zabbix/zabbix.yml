@@ -30,6 +30,16 @@
       apt:
        update_cache: true
 
+    - name: "Install Git"
+      apt:
+       name: git
+       state: present
+
+    - name: "Install Ansible"
+      apt:
+       name: ansible
+       state: present
+
     - name: "Install Zabbix Server"
       apt:
        name: zabbix-server-mysql
@@ -111,6 +121,28 @@
         state: mounted
       when: lb_primary == "yes"
       with_items: "{{ (lb_primary | default([])) }}"
+
+    - name: Create MC base folder on primary node only
+      file:
+        path: /var/lib/mysql/MC/IaC
+        owner: zabbix
+        group: zabbix
+        state: directory
+      when: lb_primary == "yes"
+      with_items: "{{ (lb_primary | default([])) }}"
+
+    - name: Download iac-pull.sh script
+      get_url:
+        url: "{{ git_source }}/zabbix/scripts/iac-pull.sh"
+        dest: /var/lib/mysql/MC/
+      when: lb_primary == "yes"
+      with_items: "{{ lb_primary | default([]) }}"
+
+    - name: Change iac-pull.sh script permission
+      file:
+        path: /var/lib/mysql/MC/iac-pull.sh
+        state: touch
+        mode: "u=rwx,g=rx,o=rx"
 
     - name: "Install mariadb-common"
       apt:
