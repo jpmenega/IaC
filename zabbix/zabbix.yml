@@ -30,6 +30,76 @@
       apt:
        update_cache: true
 
+    - name: Create Zabbix MySQL data folder
+      file:
+        path: /var/lib/mysql
+        state: directory
+
+    - name: Turn primary node as DRBD primary
+      shell: "drbdadm primary zabbix"
+      when: lb_primary == "yes"
+      with_items: "{{ (lb_primary | default([])) }}"
+
+    - name: Mount DRBD on primary node only
+      mount:
+        path: /var/lib/mysql
+        src: /dev/{{ drbd_zabbix_volume }}
+        opts: acl
+        fstype: ext4
+        state: mounted
+      when: lb_primary == "yes"
+      with_items: "{{ (lb_primary | default([])) }}"
+
+    - name: Create MC base folder on primary node only
+      file:
+        path: /var/lib/mysql/MC/IaC
+        owner: zabbix
+        group: zabbix
+        state: directory
+      when: lb_primary == "yes"
+      with_items: "{{ (lb_primary | default([])) }}"
+
+    - name: Download iac-pull.sh script
+      get_url:
+        url: "{{ git_source }}/zabbix/scripts/iac-pull.sh"
+        dest: /var/lib/mysql/MC/
+      when: lb_primary == "yes"
+      with_items: "{{ lb_primary | default([]) }}"
+
+    - name: Change iac-pull.sh script permission
+      file:
+        path: /var/lib/mysql/MC/iac-pull.sh
+        state: touch
+        mode: "u=rwx,g=rx,o=rx"
+      when: lb_primary == "yes"
+      with_items: "{{ lb_primary | default([]) }}"
+
+    - name: "Install mariadb-common"
+      apt:
+        name: mariadb-common
+        state: present
+
+    - name: "Install mariadb-client"
+      apt:
+        name: mariadb-client
+        state: present
+
+    - name: "Install mariadb-server"
+      apt:
+        name: mariadb-server
+        state: present
+      #throttle: 1
+
+    - name: Disable service mysqld
+      service:
+        name: mariadb.service
+        enabled: no
+
+    - name: Stop mysqld
+      service:
+        name: mariadb.service
+        state: stopped
+
     - name: "Install Git"
       apt:
        name: git
@@ -106,81 +176,10 @@
         name: zabbix-agent.service
         state: restarted
 
-    - name: Create Zabbix MySQL data folder
-      file:
-        path: /var/lib/mysql
-        state: directory
-
-    - name: Turn primary node as DRBD primary
-      shell: "drbdadm primary zabbix"
-      when: lb_primary == "yes"
-      with_items: "{{ (lb_primary | default([])) }}"
-
-    - name: Mount DRBD on primary node only
-      mount:
-        path: /var/lib/mysql
-        src: /dev/{{ drbd_zabbix_volume }}
-        opts: acl
-        fstype: ext4
-        state: mounted
-      when: lb_primary == "yes"
-      with_items: "{{ (lb_primary | default([])) }}"
-
-    - name: Create MC base folder on primary node only
-      file:
-        path: /var/lib/mysql/MC/IaC
-        owner: zabbix
-        group: zabbix
-        state: directory
-      when: lb_primary == "yes"
-      with_items: "{{ (lb_primary | default([])) }}"
-
-    - name: Download iac-pull.sh script
-      get_url:
-        url: "{{ git_source }}/zabbix/scripts/iac-pull.sh"
-        dest: /var/lib/mysql/MC/
-      when: lb_primary == "yes"
-      with_items: "{{ lb_primary | default([]) }}"
-
-    - name: Change iac-pull.sh script permission
-      file:
-        path: /var/lib/mysql/MC/iac-pull.sh
-        state: touch
-        mode: "u=rwx,g=rx,o=rx"
-      when: lb_primary == "yes"
-      with_items: "{{ lb_primary | default([]) }}"
-
-    - name: "Install mariadb-common"
-      apt:
-        name: mariadb-common
-        state: present
-
-    - name: "Install mariadb-client"
-      apt:
-        name: mariadb-client
-        state: present
-
-    - name: "Install mariadb-server"
-      apt:
-        name: mariadb-server
-        state: present
-      #throttle: 1
-
-    - name: Disable service mysqld
-      service:
-        name: mysql.service
-        enabled: no
-
-    - name: Stop mysqld
-      service:
-        name: mysql.service
-        state: stopped
-
     - name: Download storage tunning
-      shell: "wget {{ git_source }}/zabbix/config/default_auth.cnf"
-      args:
-        chdir: /etc/mysql/conf.d/
-        creates: /etc/mysql/conf.d/default_auth.cnf
+      get_url:
+        url: "{{ git_source }}/zabbix/config/default_auth.cnf"
+        dest: /etc/mysql/conf.d/
 
     - name: "Configure Mysql Listen"
       lineinfile:
@@ -281,10 +280,9 @@
         state=present
 
     - name: Download Frontend database connection config
-      shell: "wget {{ git_source }}/zabbix/config/zabbix.conf.php"
-      args:
-        chdir: /etc/zabbix/web
-        creates: /etc/zabbix/web/zabbix.conf.php
+      get_url:
+        url: "{{ git_source }}/zabbix/config/zabbix.conf.php"
+        dest: /etc/zabbix/web
 
     - name: "Configure Frontend database connection config"
       replace:

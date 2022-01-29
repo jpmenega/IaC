@@ -149,7 +149,7 @@ mysql_start()
         if [ -n "$OCF_RESKEY_scriptpath" ]; then
                 COMMAND="$OCF_RESKEY_scriptpath"
         else
-                COMMAND="service mysql start"
+                COMMAND="service mariadb start"
         fi
 
 	#is_isolation
@@ -190,7 +190,7 @@ mysql_stop()
                 PID=`cat $PIDFILE`
                 if [ -n "$PID" ] ; then
                         #kill $PID
-                        service mysql stop
+                        service mariadb stop
                         if [ $? -ne 0 ]; then
                                 kill -SIGKILL $PID
                                 if [ $? -ne 0 ]; then

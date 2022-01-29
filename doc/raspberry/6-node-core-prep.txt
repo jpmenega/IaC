@@ -27,17 +27,12 @@ apt install drbd-utils
                 shared-secret "secret";
         }
 
-/etc/drbd.d/drbd.res
-resource drbd {
-        on core01 {
+/etc/drbd.d/samba.res
+resource samba {
+	on core01 {
                 volume 0 {
                         device /dev/drbd0;
                         disk /dev/vdb;
-                        meta-disk internal;
-                }
-                volume 1 {
-                        device /dev/drbd1;
-                        disk /dev/vdc;
                         meta-disk internal;
                 }
                 address 192.168.20.7:7788;
@@ -48,21 +43,30 @@ resource drbd {
                         disk /dev/vdb;
                         meta-disk internal;
                 }
+                address 192.168.20.8:7788;
+        }
+}
+
+/etc/drbd.d/zabbix.res
+resource zabbix {
+        on core02 {
                 volume 1 {
                         device /dev/drbd1;
                         disk /dev/vdc;
                         meta-disk internal;
                 }
-                address 192.168.20.8:7788;
+                address 192.168.20.8:7789;
         }
 }
 
 #ambos nodes
-drbdadm create-md drbd
+drbdadm create-md samba
+drbdadm create-md zabbix
 service drbd start
 
 #node 1
-drbdadm primary drbd --force
+drbdadm primary samba --force
+drbdadm primary zabbix --force
 
 #node 2
 drbdadm status
@@ -70,8 +74,14 @@ watch -n1 cat /proc/drbd
 
 #node 1
 mkfs.btrfs /dev/drbd0
-mkfs.btrfs /dev/drbd1
-drbdadm secondary drbd
+mkfs.ext4 /dev/drbd1
+
+#comando para verificar o tipo/formato da particao
+file -sL /dev/drbd0
+file -sL /dev/drbd1
+
+drbdadm secondary samba
+drbdadm secondary zabbix
 
 systemctl disable pacemaker.service
 

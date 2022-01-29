@@ -8,7 +8,7 @@ Source script server
 mkdir ~/IaC
 cd ~/IaC
 
-nano ~/docker-cluster/hosts-core (alterar IPs)
+nano ~/IaC/hosts-core (alterar IPs)
 
 ansible-playbook -i hosts-core main/initial.yml
 ansible-playbook -i hosts-core lb/loadbalancer.yml

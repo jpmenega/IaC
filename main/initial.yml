@@ -74,11 +74,15 @@
         path: /etc/zabbix/zabbix_agentd.d
         state: directory
 
-    - name: Configure zabbix user shell and create home folder
-      user:
-        name: zabbix
-        shell: /bin/bash
-        create_home: yes
+    - name: Configure zabbix user shell
+      shell: "chsh -s /bin/bash zabbix"
+
+    - name: Create zabbix user home folder
+      file:
+        path: "~zabbix"
+        state: directory
+        owner: zabbix
+        group: zabbix
 
     #- name: gluster-monitoring.pl
     #  shell: "wget {{ git_source }}/main/zabbix-agent/gluster-monitoring.pl"
