@@ -18,7 +18,6 @@ master_node_delegate=samba-ad-dc02
 cluster_vip_ip=192.168.1.249
 cluster_vip_netmask=24
 cluster_vip_nic=eth0
-cluster_name=samba
 ltb_token=<token>
 ltb_binddn=cn=Administrator,cn=Users,dc=uz,dc=intranet
 ltb_bindpw=<password>

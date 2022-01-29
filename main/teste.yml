@@ -1,0 +1,8 @@
+- hosts: active
+  become: yes
+  tasks:
+    - name: Configure zabbix user
+      user:
+        name: zabbix
+        shell: /bin/bash
+        create_home: yes

@@ -1,0 +1,43 @@
+[active]
+core02 ansible_host=192.168.20.8 ansible_user=root lb_primary=yes device_id=host02 nodePeer=192.168.20.7
+
+[on_hold]
+core01 ansible_host=192.168.20.7 ansible_user=root lb_slave=yes device_id=host01 nodePeer=192.168.20.8
+
+[all:vars]
+ansible_python_interpreter=/usr/bin/python3
+ansible_distribution=Debian
+zabbix_agent_package_url=https://repo.zabbix.com/zabbix/5.4/ubuntu-arm64/pool/main/z/zabbix-release/zabbix-release_5.4-1+ubuntu20.04_all.deb
+zabbix_agent_package_name=zabbix-release_5.4-1+ubuntu20.04_all.deb
+zabbix_server_address=192.168.20.0/24
+mysql_zabbix_password=zabbix_pwd
+name_server=192.168.20.1
+master_node_delegate=core01
+git_source=https://raw.githubusercontent.com/jpmenega/IaC/main
+domain_name=mc.intranet
+zabbix_vip_ip=192.168.20.7
+zabbix_vip_nic=br0
+zabbix_vip_netmask=24
+mysql_vip_ip=192.168.20.5
+mysql_vip_netmask=24
+mysql_vip_nic=br0
+check_isolation_ip=208.67.220.222
+drbd_zabbix_volume=drbd1
+
+samba_vip_ip=192.168.20.6
+samba_vip_netmask=24
+samba_vip_nic=eth0
+samba_name=samba
+ltb_token=M0st1yC10udy
+ltb_binddn=cn=Administrator,cn=Users,dc=mc,dc=intranet
+ltb_bindpw=M0st1yC10udy
+ltb_base=dc=mc,dc=intranet
+ltb_mail_from=mc.mostlycloudy@gmail.com
+ltb_mail_from_name=MC Intranet - Reset de senha
+ltb_mail_smtp_host=smtp.gmail.com
+ltb_mail_smtp_user=mc.mostlycloudy@gmail.com
+ltb_mail_smtp_pass=<password>
+#https://myaccount.google.com/lesssecureapps
+ltb_mail_smtp_port=587
+company_logo=https://static.wixstatic.com/media/867ddd_9e2d33d238604264a7756e14430d2ade~mv2.png/v1/fill/w_179,h_55,al_c,q_85,usm_0.66_1.00_0.01/logo%20cloud%20back%20yellow%20text_PNG.webp
+drbd_samba_volume=drbd0

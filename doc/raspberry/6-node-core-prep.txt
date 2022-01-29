@@ -1,0 +1,106 @@
+===========================
+sudo su
+passwd
+
+ip addr show
+netplan apply (se precisar reaplicar o DHCP)
+
+vim.tiny /etc/ssh/sshd_config (PermitRootLogin yes)
+service sshd restart
+
+**Acessar agora por SSH
+
+*se precisar setar IP e Hostname
+echo raspberry0? > /etc/hostname
+
+apt install drbd-utils
+(debian)/lib/systemd/systemd-sysv-install disable drbd
+(ubuntu)systemctl disable drbd.service
+
+/etc/drbd.d/global_common.conf
+        startup {
+                wfc-timeout  15;
+                degr-wfc-timeout 60;
+        }
+        net {
+                cram-hmac-alg sha1;
+                shared-secret "secret";
+        }
+
+/etc/drbd.d/drbd.res
+resource drbd {
+        on core01 {
+                volume 0 {
+                        device /dev/drbd0;
+                        disk /dev/vdb;
+                        meta-disk internal;
+                }
+                volume 1 {
+                        device /dev/drbd1;
+                        disk /dev/vdc;
+                        meta-disk internal;
+                }
+                address 192.168.20.7:7788;
+        }
+        on core02 {
+                volume 0 {
+                        device /dev/drbd0;
+                        disk /dev/vdb;
+                        meta-disk internal;
+                }
+                volume 1 {
+                        device /dev/drbd1;
+                        disk /dev/vdc;
+                        meta-disk internal;
+                }
+                address 192.168.20.8:7788;
+        }
+}
+
+#ambos nodes
+drbdadm create-md drbd
+service drbd start
+
+#node 1
+drbdadm primary drbd --force
+
+#node 2
+drbdadm status
+watch -n1 cat /proc/drbd
+
+#node 1
+mkfs.btrfs /dev/drbd0
+mkfs.btrfs /dev/drbd1
+drbdadm secondary drbd
+
+systemctl disable pacemaker.service
+
+-------
+#split brain
+na vitima:
+drbdadm disconnect drbd
+drbdadm secondary  drbd
+drbdadm connect  --discard-my-data   drbd
+
+no que vai assumir como principal:
+drbdadm disconnect drbd
+drbdadm connect drbd
+
+-------
+#zerar um node secundario para forcar um resync full
+drbdadm down drbd
+drbdadm wipe-md drbd
+drdbadm create-md drbd
+drbdadm up drbd
+-------
+
+-----
+https://linbit.com/drbd-user-guide/drbd-guide-9_0-en/
+9.3. Using automated LVM snapshots during DRBD synchronization
+MTU 9000
+------
+
+*Primeiro node master e worker (necessario para copia das chaves do Corosync pela task de synchronize):
+ssh-keygen
+ssh-copy-id root@<demais_nodes_do_grupo_IP>
+

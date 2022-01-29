@@ -18,6 +18,7 @@ pg_restore -U postgres -d YB019 -v "YB019.backup"
 pg_restore -U postgres -d YB019FR -v "YB019FR.backup"
 pg_restore -U postgres -d destra -v "destra.backup"
 pg_restore -U postgres -d yb_backup -v "yb_backup.backup"
+** criar usuário da monitoracao do Zabbix (monitor.txt)
 
 
 Linha de comando usada pelo Rafael para fazer backup

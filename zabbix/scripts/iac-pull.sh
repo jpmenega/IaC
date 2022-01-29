@@ -2,9 +2,9 @@
 cd "$(dirname "$0")"
 if [[ -d "IaC" ]]
 then
-  echo "Fetching..."
+  echo "Pulling..."
   cd IaC
-  git fetch &
+  git pull &
   [[ $? != 0 ]] && exit 1
 else
   echo "Cloning..."
