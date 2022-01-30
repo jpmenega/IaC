@@ -24,9 +24,15 @@ mysql_vip_ip=192.168.20.4
 mysql_vip_netmask=24
 mysql_vip_nic=enp1s0
 mysql_zabbix_password=zabbix_pwd
+#when running restoreDB.yml
+backup_2_restore=/tmp/zabbix_zabbix.sql.gz
 check_isolation_ip=208.67.220.222
 drbd_zabbix_volume=drbd1
 
+domain_name=mc.intranet
+domain_name_upper=MC.INTRANET
+domain_password=<password>
+dns_server=192.168.20.12
 samba_vip_ip=192.168.20.6
 samba_vip_netmask=24
 samba_vip_nic=enp1s0

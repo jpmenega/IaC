@@ -1,2 +1,0 @@
-https://wiki.samba.org/index.php/Back_up_and_Restoring_a_Samba_AD_DC
-https://dev.tranquil.it/samba/en/samba_advanced_methods/samba_backup_restore_rename.html

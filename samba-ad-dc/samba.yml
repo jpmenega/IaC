@@ -40,6 +40,7 @@
       file:
         path: /var/lib/samba
         state: directory
+        mode: '0755'
 
     - name: Configure pacemaker Samba VIP
       shell: "crm node standby {{ inventory_hostname }} > samba-lb-standby.txt"
@@ -48,10 +49,9 @@
         creates: samba-lb-standby.txt
 
     - name: Download crm samba script
-      shell: "wget {{ git_source }}/samba-ad-dc/scripts/sambaSVC"
-      args:
-        chdir: /usr/lib/ocf/resource.d/heartbeat
-        creates: /usr/lib/ocf/resource.d/heartbeat/sambaSVC
+      get_url:
+        url: "{{ git_source }}/samba-ad-dc/scripts/sambaSVC"
+        dest: /usr/lib/ocf/resource.d/heartbeat
 
     - name: change samba script permission
       file:

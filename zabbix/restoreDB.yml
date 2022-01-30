@@ -1,4 +1,4 @@
-- hosts: database_server
+- hosts: active
   become: yes
   tasks:
     - name: Drop Zabbix database
@@ -18,7 +18,7 @@
     - name: MySQL disable strict mode
       shell: "mysql -uroot -p'{{ mysql_zabbix_password }}' -e \"set global innodb_strict_mode='OFF';\""
 
-    - name: Restore bakup from {{ backup_2_restore }}
+    - name: Restore backup from {{ backup_2_restore }}
       shell: "zcat {{ backup_2_restore }} | mysql -uzabbix -p'{{ mysql_zabbix_password }}' zabbix"
 
     - name: MySQL enable strict mode

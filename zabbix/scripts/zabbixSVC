@@ -152,14 +152,18 @@ zabbix_stop()
                 PID=`cat $PIDFILE`
                 if [ -n "$PID" ] ; then
                         #kill $PID
-                        service zabbix-server stop
-                        if [ $? -ne 0 ]; then
-                                kill -SIGKILL $PID
-                                if [ $? -ne 0 ]; then
-                                        ocf_log err "Error. Could not stop zabbix daemon."
-                                        return $OCF_ERR_GENERIC
-                                fi
-                        fi
+                        #service zabbix-server stop
+                        #if [ $? -ne 0 ]; then
+                        #        kill -SIGKILL $PID
+                        #        if [ $? -ne 0 ]; then
+                        #                ocf_log err "Error. Could not stop zabbix daemon."
+                        #                return $OCF_ERR_GENERIC
+                        #        fi
+                        #fi
+			PIDS=`ps -A|grep zabbix_server|awk '{print $1}'`
+                        for PID in $PIDS; do
+                          kill -9 $PID
+                        done
                         rm $PIDFILE 2>/dev/null
                 fi
         fi

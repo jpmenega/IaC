@@ -330,10 +330,9 @@
       with_items: "{{ (lb_slave | default([])) }}"
 
     - name: Download crm mysql script
-      shell: "wget {{ git_source }}/zabbix/scripts/mysqlSVC"
-      args:
-        chdir: /usr/lib/ocf/resource.d/heartbeat
-        creates: /usr/lib/ocf/resource.d/heartbeat/mysqlSVC
+      get_url:
+        url: "{{ git_source }}/zabbix/scripts/mysqlSVC"
+        dest: /usr/lib/ocf/resource.d/heartbeat
 
     - name: change mysql script permission
       file:

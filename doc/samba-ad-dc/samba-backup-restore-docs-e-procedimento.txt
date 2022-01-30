@@ -1,0 +1,23 @@
+https://wiki.samba.org/index.php/Back_up_and_Restoring_a_Samba_AD_DC
+https://dev.tranquil.it/samba/en/samba_advanced_methods/samba_backup_restore_rename.html
+
+**copiar config (smb.conf) e backup do DB do samba para /tmp
+
+# Restore config do DB Samba
+cd /tmp
+bunzip2 samba-backup-mc.intranet-2022-01-29T19-35-37.702061.tar.bz2
+# a pasta /var/lib/samba precisa estar vazia para fazer o restore
+samba-tool domain backup restore --backup-file=<tar-file> --newservername=<DC-name> --targetdir=<new-samba-dir>
+samba-tool domain backup restore --backup-file=samba-backup-mc.intranet-2022-01-29T19-35-37.702061.tar --newservername=mc.intranet --targetdir=/var/lib/samba
+cp /tmp/smb.conf /var/lib/samba
+
+# Prepara estrutura de pastas
+cd /var/lib/samba
+btrfs subvolume create DATA
+cd DATA
+mkdir samba-backup
+mkdir shares
+mkdir sysvol (obs. no teste sysvol foi restaurado em /var/lib/samba/state, acho que pode deixar mas tem que corrigir smb.conf)
+
+# Restore dos arquivos (já pode subir o serviço do Samba nesse ponto)
+rsync -axv . 192.168.20.8:/var/lib/samba/DATA/shares
