@@ -2,6 +2,11 @@
 
 LOG_FILE=/var/log/backup.log
 
-echo "$(date) Backup done" >> $LOG_FILE
+echo "$(date) Backup finished, clearing temporary files" >> $LOG_FILE
+
+rm /var/opt/mssql/backup/SecullumMEDLAV.bak.gz
+[ $? -eq 0 ]  || exit 1
+
+echo "$(date) Backup successful" >> $LOG_FILE
 
 exit 0

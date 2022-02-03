@@ -1,3 +1,12 @@
+SERVIDOR DESTINO
+- Criar usuario para o cliente (exemplo uz)
+- Montar disco do cliente em /mnt/<cliente>
+- Dar permissao na raiz do disco (exemplo chown <cliente>:<cliente> .)
+- Adicionar usuario do cliente no sudoers para executar o btrfs (exemplo: uz      ALL=(ALL) NOPASSWD: /usr/bin/btrfs)
+
+
+
+
 https://ownyourbits.com/2018/03/09/easy-sync-of-btrfs-snapshots-with-btrfs-sync/
 https://blogs.oracle.com/linux/post/btrfs-sendreceive-helps-to-move-and-backup-your-data (NO FINAL TEM UM BLOCO POSSIVELMENTE MOSTRANDO UM SYNC INCREMENTAL)
 https://davidshomelab.com/a-simple-unix-backup-script-utilising-rsync-and-btrfs/ (Dica Zabbix para script do sync)

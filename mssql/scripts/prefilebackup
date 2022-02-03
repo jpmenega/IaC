@@ -7,5 +7,9 @@ echo "$(date) Backup SQL Server SecullumMEDLAV database" >> $LOG_FILE
 /opt/mssql-tools/bin/sqlcmd -S localhost -U backup -P 'h56mmqLEMsQP5DT8' -Q "BACKUP DATABASE [SecullumMEDLAV] TO DISK = '/var/opt/mssql/backup/SecullumMEDLAV.bak' WITH NOFORMAT, NOINIT, NAME = 'SecullumMEDLAV-Full Database Backup', SKIP, NOREWIND, NOUNLOAD, STATS = 10"
 [ $? -eq 0 ]  || exit 1
 
+cd /var/opt/mssql/backup/
+gzip -1 SecullumMEDLAV.bak
+[ $? -eq 0 ]  || exit 1
+
 echo "$(date) Backup pre tasks done." >> $LOG_FILE
 exit 0
