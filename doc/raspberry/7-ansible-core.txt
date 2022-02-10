@@ -15,6 +15,6 @@ ansible-playbook -i hosts-core lb/loadbalancer.yml
 
 ansible-playbook -i hosts-core zabbix/zabbix.yml
   ==> ansible-playbook -i hosts-core zabbix/restoreDB.yml
-ansible-playbook -i hosts-core samba/samba.yml
+ansible-playbook -i hosts-core samba-ad-dc/samba.yml
 
 

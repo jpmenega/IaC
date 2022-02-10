@@ -1,0 +1,23 @@
+Iniciar a VM no startup
+
+# cat /etc/systemd/system/startup.service
+----------------------------
+[Unit]
+After=startup.service
+
+[Service]
+ExecStart=/etc/startup.sh
+
+[Install]
+WantedBy=default.target
+---------------------------
+
+# cat /etc/startup.sh
+----------------------------
+#!/bin/bash
+
+/usr/bin/virsh start pfSense02
+----------------------------
+
+# systemctl daemon-reload
+# systemctl enable startup.service

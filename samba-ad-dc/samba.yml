@@ -136,3 +136,13 @@
     #   creates: samba-lb-prefer.txt
     #  when: lb_primary == "yes"
     #  with_items: "{{ (lb_primary | default([])) }}"
+
+    - name: Stop winbind
+      service:
+        name: winbind.service
+        state: stopped
+
+    - name: Stop nmbd
+      service:
+        name: nmbd.service
+        state: stopped

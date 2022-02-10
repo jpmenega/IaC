@@ -59,6 +59,15 @@
       when: lb_primary == "yes"
       with_items: "{{ (lb_primary | default([])) }}"
 
+    - name: Create MC base folder on primary node only
+      file:
+        path: /var/lib/mysql/MC/IaC/.ssh
+        owner: zabbix
+        group: zabbix
+        state: directory
+      when: lb_primary == "yes"
+      with_items: "{{ (lb_primary | default([])) }}"
+
     - name: Download iac-pull.sh script
       get_url:
         url: "{{ git_source }}/zabbix/scripts/iac-pull.sh"
@@ -73,6 +82,29 @@
         mode: "u=rwx,g=rx,o=rx"
       when: lb_primary == "yes"
       with_items: "{{ lb_primary | default([]) }}"
+
+    - name: Create RSA key
+      shell: "ssh-keygen -t rsa -f /var/lib/mysql/MC/.ssh/id_rsa -q -P \"\""
+      args:
+        creates: /var/lib/mysql/MC/.ssh/id_rsa
+      when: lb_primary == "yes"
+      with_items: "{{ (lb_primary | default([])) }}"
+
+    - name: Change private key owner
+      file:
+        path: /var/lib/mysql/MC/IaC/.ssh/id_rsa
+        owner: zabbix
+        group: zabbix
+      when: lb_primary == "yes"
+      with_items: "{{ (lb_primary | default([])) }}"
+
+    - name: Change public key owner
+      file:
+        path: /var/lib/mysql/MC/IaC/.ssh/id_rsa.pub
+        owner: zabbix
+        group: zabbix
+      when: lb_primary == "yes"
+      with_items: "{{ (lb_primary | default([])) }}"
 
     - name: "Install mariadb-common"
       apt:
@@ -139,6 +171,13 @@
       service:
         name: apache2.service
         state: stopped
+
+    - name: Create a symbolic link for public key
+      file:
+        src: /var/lib/mysql/MC/.ssh/id_rsa.pub
+        dest: /var/www/html/id_rsa.pub
+        state: link
+        force: yes
 
     - name: Create Zabbix Home
       file:
@@ -225,6 +264,7 @@
       args:
         chdir: $HOME
         creates: zabbix-mysql-privileges-{{ item }}.{{ domain_name }}.txt
+      when: lb_primary == "yes"
       with_items: "{{ groups['all'] }}"
 
     - name: MySQL disable strict mode
@@ -319,6 +359,13 @@
       file:
         state: absent
         path: /var/lib/mysql
+      when: lb_slave == "yes"
+      with_items: "{{ (lb_slave | default([])) }}"
+
+    - name: Recreate Zabbix MySQL empty data folder on secondary nodes
+      file:
+        path: /var/lib/mysql
+        state: directory
       when: lb_slave == "yes"
       with_items: "{{ (lb_slave | default([])) }}"
 
@@ -492,10 +539,10 @@
       when: lb_primary == "yes"
       with_items: "{{ (lb_primary | default([])) }}"
 
-    #- name: "Install cifs-utils to allow mount smb as backup destinaiton"
-    #  apt:
-    #   name: cifs-utils
-    #   state: present
+    - name: "Install cifs-utils to allow mount smb as backup destination"
+      apt:
+       name: cifs-utils
+       state: present
 
     #- name: Download backup script
     #  shell: "wget {{ git_source }}/zabbix/scripts/backup.sh"

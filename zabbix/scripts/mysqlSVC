@@ -99,7 +99,7 @@ mysql_status()
                 # mysql is probably running
                 PID=`cat $PIDFILE`
                 if [ -n "$PID" ]; then
-                        if ps -p $PID | grep mariadbd >/dev/null ; then
+                        if ps -p $PID | grep mysqld >/dev/null ; then
                                 ocf_log info "info mysql daemon running"
                                 return $OCF_SUCCESS
                         else

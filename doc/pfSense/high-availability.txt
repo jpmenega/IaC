@@ -1,0 +1,22 @@
+Definir IPs
+-carp      192.168.15.1 - 10.0.0.120
+-pfSense01 192.168.15.2 - 10.0.0.4
+-pfSense02 192.168.15.3 - 10.0.0.5
+
+System > High Avail. Sync
+
+Criar regra de firewall para liberar trafego entre os IP dos 2 pfSense
+
+Equalizar configuracoes desses menus:
+-System > Advanced
+-System > General Setup
+-System > Package Manager
+-Interface > WAN (verificar GW)
+
+Interface > Assignments (verificar se nao perdeu ou precisa atribuir interface do OpenVPN site-to-site com a Mostly Cloudy)
+
+Services > DNS Forwarder (verificar interface - LAN CARP)
+
+Service> Squid Proxy Server (o sync por XMLRPC é feito por aqui)
+Service> SquidGuardProxy filter (o sync por XMLRPC é feito por aqui)
+
