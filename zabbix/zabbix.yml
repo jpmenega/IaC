@@ -30,6 +30,12 @@
       apt:
        update_cache: true
 
+    - name: Create mountpoint backup folder
+      file:
+        path: /mnt/backup
+        mode: "u=rwx,g=rwx,o=rwx"
+        state: directory
+
     - name: Create Zabbix MySQL data folder
       file:
         path: /var/lib/mysql
@@ -178,6 +184,13 @@
         dest: /var/www/html/id_rsa.pub
         state: link
         force: yes
+
+    - name: "Configure Zabbix Server SSHKeyLocation"
+      lineinfile:
+        dest=/etc/zabbix/zabbix_server.conf
+        regexp='^# SSHKeyLocation='
+        line="SSHKeyLocation=/var/lib/mysql/MC/.ssh"
+        state=present
 
     - name: Create Zabbix Home
       file:
