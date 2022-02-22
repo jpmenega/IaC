@@ -87,7 +87,7 @@ while true; do
     -d|--delete ) DELETE=1   ; shift 1 ;;
     -k|--keep   ) KEEP=$2    ; shift 2 ;;
     -p|--port   ) PORT=$2    ; shift 2 ;;
-    -z|--xz     ) ZIP=( gzip -1 ) PIZ=( gunzip ); shift 1 ;;
+    -z|--xz     ) ZIP=xz     PIZ=( xz     -d ); shift 1 ;;
     -Z|--pbzip2 ) ZIP=pbzip2 PIZ=( pbzip2 -d ); shift 1 ;;
     -v|--verbose) SILENT=""  VERBOSE=1        ; shift 1 ;;
     --)                shift;  break   ;;

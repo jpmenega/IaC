@@ -1,0 +1,22 @@
+Mostly Cloudy coreXX (criar "drive" remoto)
+# cfdisk /dev/vdd
+# mkfs.btrfs /dev/vdd1
+
+# adduser <customer>
+# mkdir /mnt/<customer>
+# vim.tiny /etc/fstab
+/dev/vdd1       /mnt/medlav btrfs    defaults,noatime        0 0
+
+# mount /mnt/medlav/
+# df -h
+# visudo
+<customer>      ALL=(ALL) NOPASSWD: /usr/bin/btrfs
+
+*Liberar IP do cliente no firewall para acessar o coreXX via SSH
+
+Cliente (urbackup)
+# cd /mnt/medlav
+# chown medlav.medlav .
+# ssh-keygen
+# ssh-copy-id medlav@mostlycloudy02.ddns.net
+* scripts já copiado pelo Ansible que cria o servidor
