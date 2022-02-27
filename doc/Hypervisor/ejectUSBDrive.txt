@@ -1,0 +1,3 @@
+lsblk
+eject -v /dev/vdb
+udisksctl power-off -b /dev/vdb

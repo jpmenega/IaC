@@ -5,10 +5,10 @@ ssh-keygen
 ssh-copy-id root@<node_ip>
 ============================
 Source script server
-mkdir ~/docker-cluster
-cd ~/docker-cluster
+mkdir ~/IaC
+cd ~/IaC
 
-nano ~/docker-cluster/hosts-zabbix (alterar IPs)
+nano ~/IaC/hosts-zabbix (alterar IPs)
 
 ansible-playbook -i hosts-zabbix main/initial.yml
 #ansible-playbook -i hosts-zabbix docker/docker.yml

@@ -12,5 +12,5 @@ zabbix_agent_package_name=zabbix-release_5.4-1+ubuntu20.04_all.deb
 zabbix_server_address=192.168.1.0/24
 name_server=192.168.1.1
 master_node_delegate=hypervisor01
-git_source=https://raw.githubusercontent.com/jpmenega/docker-infra/main
+git_source=https://raw.githubusercontent.com/jpmenega/IaC/main
 domain_name=uz.intranet

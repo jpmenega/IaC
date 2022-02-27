@@ -1,0 +1,154 @@
+zabbix_export:
+  version: '5.4'
+  date: '2022-02-27T19:41:13Z'
+  groups:
+    -
+      uuid: 3500ba09d0534297840ca620c9dd46bf
+      name: Backup
+  templates:
+    -
+      uuid: 1be8647b9cec47459875bd72947c1c4b
+      template: 'MC IaC - Backup replica offsite'
+      name: 'MC IaC - Backup replica offsite'
+      groups:
+        -
+          name: Backup
+      items:
+        -
+          uuid: 2795025422004579a2f13640134b5bde
+          name: 'Replica offsite start'
+          type: SSH
+          key: 'ssh.run[{HOST.HOST},{HOST.CONN},22]'
+          delay: '0;{$REPLICA_OFFSITE_SCHEDULE}'
+          trends: '0'
+          value_type: CHAR
+          params: |
+            #!/bin/bash
+            sudo /bin/bash -c '
+            #!/bin/bash
+            
+            SECONDS=0
+            
+            source_folder=/media/BACKUP/urbackup
+            dest=uz@joaopaulomenegatti.ddns.net
+            dest_folder=/mnt/UZ
+            
+            #First sync UrBackup structure and own backup
+            echo "**************" > {$LOG_FILE}
+            echo `date +%y-%m-%d_%H:%M` "Syncing UrBackup structure and own backup - clients" >> {$LOG_FILE}
+            rsync -aAvz --delete-delay $source_folder/clients $dest:$dest_folder >> {$LOG_FILE}
+            [[ $? != 0 ]] && exit 1
+            echo `date +%y-%m-%d_%H:%M` "Syncing UrBackup structure and own backup - urbackup" >> {$LOG_FILE}
+            rsync -aAvz --delete-delay $source_folder/urbackup $dest:$dest_folder >> {$LOG_FILE}
+            [[ $? != 0 ]] && exit 1
+            #rsync -aAvz --delete-delay $source_folder/urbackup_tmp_files $dest:$dest_folder
+            #[[ $? != 0 ]] && exit 1
+            
+            
+            echo `date +%y-%m-%d_%H:%M` "Loading backups names" >> {$LOG_FILE}
+            # Volumes list
+            volumes=( $(ls -lah $source_folder|awk "{print \$NF}"|grep -v total|grep -v clients|grep -v urbackup|grep -v PST) )
+            n_vol=0
+            
+            echo `date +%y-%m-%d_%H:%M` "Syncing backups" >> {$LOG_FILE}
+            # Sync each BTRS backup volume
+            for volume in "${volumes[@]}"
+            do
+               #ignore . and ..
+               if [[ $volume != "." && $volume != ".." ]]; then
+                 #check if volume is realy a folder
+                 if [ -d "$source_folder/$volume" ]; then
+                    #create folder in destiny if not exist
+                    ssh $dest mkdir -p $dest_folder/$volume
+            
+                    #Sync BTFS volume
+                    echo "**************" >> {$LOG_FILE}
+                    echo `date +%y-%m-%d_%H:%M` "Syncing $volume volume" >> {$LOG_FILE}
+                    #/usr/local/sbin/btrfs-sync -d -v -Z $source_folder/$volume $dest:$dest_folder/$volume
+                    /usr/local/sbin/btrfs-sync -d -v -z $source_folder/$volume $dest:$dest_folder/$volume >> {$LOG_FILE}
+                    #/usr/local/sbin/btrfs-sync -d -v $source_folder/$volume $dest:$dest_folder/$volume
+                    [[ $? != 0 ]] && exit 1
+                    ((n_vol+=1))
+                 fi
+               fi
+            done
+            [[ $n_vol == 0 ]] && exit 1
+            
+            # ----------------------
+            
+            echo `date +%y-%m-%d_%H:%M` "Loading backups names (PST)" >> {$LOG_FILE}
+            # Volumes list (PST)
+            volumes=( $(ls -lah $source_folder|awk "{print \$NF}"|grep "[PST]") )
+            
+            echo `date +%y-%m-%d_%H:%M` "Syncing backups (PST)" >> {$LOG_FILE}
+            # Sync each BTRS backup volume
+            for volume in "${volumes[@]}"
+            do
+               #check if volume is realy a folder
+               if [ -d "$source_folder/$volume" ]; then
+                 # Get backup list to retrieve the last backup to sync
+                 backupList=( $(ls -lah $source_folder/$volume|awk "{print \\$NF}"|grep -v "^[.]") )
+            
+                 #create folder in destiny if not exist
+                 ssh $dest mkdir -p $dest_folder/$volume
+            
+                 echo "**************" >> {$LOG_FILE}
+                 echo `date +%y-%m-%d_%H:%M` "Syncing $volume last backup ${backupList[-1]}" >> {$LOG_FILE}
+                 echo "rsync -aAv --delete-delay --exclude=emails_desligados --exclude=emails_semuso $source_folder/$volume/${backupList[-1]}/ $dest:$dest_folder/$volume" >> {$LOG_FILE}
+                 # removi a compressao -aAvz pois a versao nova do rsync da origem estava dando problema com a versao velha do destino
+                 rsync -aAv --delete-delay --exclude=emails_desligados --exclude=emails_semuso $source_folder/$volume/${backupList[-1]}/ $dest:$dest_folder/$volume >> {$LOG_FILE}
+                 [[ $? != 0 ]] && exit 1
+                 ((n_vol+=1))
+               fi
+            done
+            [[ $n_vol == 0 ]] && exit 1
+            echo "**************" >> {$LOG_FILE}
+            echo `date +%y-%m-%d_%H:%M` "Synced $n_vol with success!" >> {$LOG_FILE}
+            duration=$SECONDS
+            echo "$(($duration / 60)) minutes and $(($duration % 60)) seconds elapsed." >> {$LOG_FILE}
+            echo "Status = OK" >> {$LOG_FILE}
+            exit 0
+            ' &
+          authtype: PUBLIC_KEY
+          username: zabbix
+          publickey: id_rsa.pub
+          privatekey: id_rsa
+          tags:
+            -
+              tag: Application
+              value: 'Replica offsite'
+        -
+          uuid: 520062f999d6499da0507015d615ec0a
+          name: 'Replica offsite checksum'
+          key: 'vfs.file.cksum[{$LOG_FILE}]'
+          delay: '60s;0/1-7,00:00-07:30;0/1-7,07:31-24:00'
+          tags:
+            -
+              tag: Application
+              value: 'Replica offsite'
+        -
+          uuid: 5d122077038748ee86e70c8d30f41d05
+          name: 'Replica offsite status'
+          key: 'vfs.file.regmatch[{$LOG_FILE},Status = OK]'
+          delay: '60s;0/1-7,00:00-07:30;0/1-7,07:31-24:00'
+          tags:
+            -
+              tag: Application
+              value: 'Replica offsite'
+      macros:
+        -
+          macro: '{$LOG_FILE}'
+          value: /var/log/replica.log
+        -
+          macro: '{$REPLICA_OFFSITE_SCHEDULE}'
+          value: wd1-7h4m0
+  triggers:
+    -
+      uuid: b1851b69bd724a5697241258701cecc0
+      expression: |
+        change(/MC IaC - Backup replica offsite/vfs.file.cksum[{$LOG_FILE}])=0
+        or
+        last(/MC IaC - Backup replica offsite/vfs.file.regmatch[{$LOG_FILE},Status = OK])=0
+      name: 'Backup offsite (remoto) falha'
+      priority: DISASTER
+      description: 'Backup log {$LOG_FILE} error'

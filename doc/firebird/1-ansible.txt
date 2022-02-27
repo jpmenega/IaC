@@ -5,10 +5,10 @@ ssh-keygen
 ssh-copy-id root@<node_ip>
 ============================
 Source script server
-mkdir ~/docker-cluster
-cd ~/docker-cluster
+mkdir ~/IaC
+cd ~/IaC
 
-nano ~/docker-cluster/hosts-firebird (alterar IPs)
+nano ~/IaC/hosts-firebird (alterar IPs)
 
 ansible-playbook -i hosts-firebird main/initial.yml
 ansible-playbook -i hosts-firebird lb/loadbalancer.yml

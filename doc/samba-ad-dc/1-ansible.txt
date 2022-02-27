@@ -5,8 +5,8 @@ ssh-keygen
 ssh-copy-id root@<node_ip>
 ============================
 Source script server
-mkdir ~/docker-cluster
-cd ~/docker-cluster
+mkdir ~/IaC
+cd ~/IaC
 
 nano hosts-samba (alterar IPs)
 
@@ -26,7 +26,7 @@ killall winbindd
 # smb.conf example
 cd /var/lib/samba
 mv smb.conf smb.old
-wget https://raw.githubusercontent.com/jpmenega/docker-infra/main/samba-ad-dc/example/smb.conf
+wget https://raw.githubusercontent.com/jpmenega/IaC/main/samba-ad-dc/example/smb.conf
 (todo: criar script para substituir valores dentro do smb.conf para o cliente)
 cd /usr/lib/ocf/resource.d/heartbeat/
 ./sambaSVC stop

@@ -5,10 +5,10 @@ ssh-keygen
 ssh-copy-id root@<node_ip>
 ============================
 Source script server
-mkdir ~/docker-cluster
-cd ~/docker-cluster
+mkdir ~/IaC
+cd ~/IaC
 
-nano ~/docker-cluster/hosts-urbackup (alterar IPs)
+nano ~/IaC/hosts-urbackup (alterar IPs)
 
 ansible-playbook -i hosts-urbackup main/initial.yml
 ansible-playbook -i hosts-urbackup backup/urbackup-server.yml

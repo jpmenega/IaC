@@ -5,10 +5,10 @@ ssh-keygen
 ssh-copy-id root@<node_ip>
 ============================
 Source script server
-mkdir ~/docker-cluster
-cd ~/docker-cluster
+mkdir ~/IaC
+cd ~/IaC
 
-nano ~/docker-cluster/hosts-raspberry (alterar IPs)
+nano ~/IaC/hosts-raspberry (alterar IPs)
 
 ansible-playbook -i hosts-raspberry main/initial.yml
 ansible-playbook -i hosts-raspberry lb/loadbalancer.yml

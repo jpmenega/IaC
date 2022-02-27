@@ -8,7 +8,7 @@ zabbix01 ansible_host=192.168.1.238 ansible_user=root
 [all:vars]
 ansible_python_interpreter=/usr/bin/python3
 domain_name=uz.intranet
-git_source=https://raw.githubusercontent.com/jpmenega/docker-infra/main
+git_source=https://raw.githubusercontent.com/jpmenega/IaC/main
 master_node_delegate=zabbix01
 mysql_zabbix_password=zabbix_pwd
 #backup_2_restore=/root/zabbix.sql.gz
