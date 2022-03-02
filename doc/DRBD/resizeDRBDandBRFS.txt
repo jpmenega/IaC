@@ -21,6 +21,7 @@ drbdadm primary samba
 drbdadm resize samba (se apenas uma VM estiver ligada o resize nao acontece)
   existe o comando abaixo mas usei o comando acima mesmo sem honerar tempo ou sync
   (drbdadm -- --assume-clean resize samba)
+drbdadm -- --assume-peer-has-space resize samba (usei para fazer em apenas 1 dos nodes, caso da Medlav que eu refiz sem LVM)
 lsblk (drbd0 com novo tamanho)
 
 mount /dev/drbd0 /var/lib/samba/
