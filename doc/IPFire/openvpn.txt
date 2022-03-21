@@ -1,0 +1,18 @@
+Gerar ca-cert, client-cert e client-key para importar no pfSense ou outro OpenVPN
+https://dbiers.me/ipfire-sitetosite-vpn-edgeouter-vyatta/
+
+*** No IPFire, baixar o .P12 que vem dentro do .ZIP, senao pode baixar o arquivo corrompido
+
+Extract CA from P12:
+# openssl pkcs12 -nokeys -cacerts -in openvpnN2N.p12 -out ca-cert.pem
+
+Extract Client Certificate from P12:
+# openssl pkcs12 -nokeys -clcerts -in openvpnN2N.p12 -out client-cert.pem
+
+Extract Client Key from P12:
+# openssl pkcs12 -nocerts -in openvpnN2N.p12 -out client-key-protected.pem (usar um pass phrase qualquer para criar o arquivo)
+
+Remove Password from Client Key:
+# openssl rsa -in client-key-protected.pem -out client-key.pem
+
+No OpenVPN importar client-cert e client-key nos "Certificates" e o ca-cert no "CAs"

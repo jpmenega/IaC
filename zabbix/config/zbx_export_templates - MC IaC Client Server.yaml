@@ -1,0 +1,267 @@
+zabbix_export:
+  version: '5.4'
+  date: '2022-03-21T18:27:30Z'
+  groups:
+    -
+      uuid: 6f6799aa69e844b4b3918f779f2abf08
+      name: 'Zabbix servers'
+  templates:
+    -
+      uuid: 8bf164cb251647a782d72dbc69b77174
+      template: 'MC IaC Client'
+      name: 'MC IaC Client'
+      groups:
+        -
+          name: 'Zabbix servers'
+      items:
+        -
+          uuid: 1f37139b64024693a9e78b7111ce951e
+          name: 'IaC - RSA Public Key'
+          type: HTTP_AGENT
+          key: id_rsa_pub
+          delay: 10m
+          history: 1d
+          trends: '0'
+          value_type: TEXT
+          timeout: 10s
+          url: 'http://{$IAC_SERVER}/id_rsa.pub'
+          tags:
+            -
+              tag: Application
+              value: 'MC IaC Client'
+          triggers:
+            -
+              uuid: 131f248d4e924a46898a63946cc2c903
+              expression: 'change(/MC IaC Client/id_rsa_pub)<>0'
+              name: 'IaC - RSA Key changed'
+              priority: INFO
+              tags:
+                -
+                  tag: Application
+                  value: 'MC IaC Client'
+      macros:
+        -
+          macro: '{$IAC_SERVER}'
+          value: 192.168.1.250
+    -
+      uuid: d47d75f52c80403b86cd37dd5a222498
+      template: 'MC IaC Client - VM Replica'
+      name: 'MC IaC Client - VM Replica'
+      groups:
+        -
+          name: 'Zabbix servers'
+      discovery_rules:
+        -
+          uuid: 433df06b1f064fdda0c18818f2cf133c
+          name: 'Discovery virtual machines to replicate'
+          type: SCRIPT
+          key: iac.vms_2_replicate
+          delay: 1h
+          params: |
+            function create_json(value, index, array) {
+              if (index>0) {
+                ret += ',\n{\n"{#VM_NAME}": "' + value + '"\n}';
+              } else {
+                ret += '{\n"{#VM_NAME}": "' + value + '"\n}';
+              }
+            }
+            
+            const vm_list = {$REPLICA_VMS_LIST}.split(";");
+            
+            var ret = '{\n"data": [\n';
+            vm_list.forEach(create_json);
+            ret += '\n]\n}';
+            return ret;
+          item_prototypes:
+            -
+              uuid: c8dd73d1a02445aa8fda96e7f40c1395
+              name: 'Replica of virtual machine {#VM_NAME} - start'
+              type: SSH
+              key: 'ssh.run[{#VM_NAME},{HOST.CONN},22]'
+              delay: '0;{$REPLICA_SCHEDULE}'
+              history: 7d
+              trends: '0'
+              value_type: CHAR
+              params: |
+                #!/bin/bash
+                sudo /bin/bash -c '
+                LOG="/var/log/{#VM_NAME}-replica.log"
+                SECONDS=0
+                
+                #shutdown VM
+                echo `date +%y-%m-%d_%H:%M` "Powering off virtual machine..." > $LOG
+                virsh shutdown {#VM_NAME}
+                [[ $? != 0 ]] && exit 1
+                sleep 3
+                virsh shutdown {#VM_NAME} --mode acpi
+                
+                #wait shutdown process...
+                TIMEOUT=60 #5min
+                VMOFFLINE=`virsh list --state-shutoff |grep {#VM_NAME}|wc -l`
+                while [[ ($VMOFFLINE -eq 0) && ($TIMEOUT -gt 0) ]]
+                do
+                        sleep 5
+                        VMOFFLINE=`virsh list --state-shutoff |grep {#VM_NAME}|wc -l`
+                        ((TIMEOUT--))
+                        echo `date +%y-%m-%d_%H:%M` $TIMEOUT >> $LOG
+                done
+                [[ $TIMEOUT -eq 0 ]] && exit 1
+                echo `date +%y-%m-%d_%H:%M` "Done!" >> $LOG
+                
+                #replica
+                echo `date +%y-%m-%d_%H:%M` "Replicating virtual machine..." >> $LOG
+                vmFiles=`virsh domblklist {#VM_NAME} --details|grep "file.*disk"|awk "{print \\$4}"`
+                for vmFile in $vmFiles
+                do
+                  echo `date +%y-%m-%d_%H:%M` $vmFile " ==> " {$REPLICA_DEST_SERVER}:{$REPLICA_DEST_FOLDER} >> $LOG
+                  # ssh into destination and move current file to old if current exist
+                  ssh {$REPLICA_DEST_SERVER} "mv {$REPLICA_DEST_FOLDER}/${vmFile##*/} {$REPLICA_DEST_FOLDER}/${vmFile##*/}.old || echo 0"
+                  [[ $? != 0 ]] && exit 1
+                  scp $vmFile {$REPLICA_DEST_SERVER}:{$REPLICA_DEST_FOLDER}
+                  [[ $? != 0 ]] && exit 1
+                done
+                /usr/bin/virsh dumpxml {#VM_NAME} > /tmp/{#VM_NAME}.xml
+                [[ $? != 0 ]] && exit 1
+                scp /tmp/{#VM_NAME}.xml {$REPLICA_DEST_SERVER}:{$REPLICA_DEST_FOLDER}
+                [[ $? != 0 ]] && exit 1
+                echo `date +%y-%m-%d_%H:%M` "Done" >> $LOG
+                
+                #start VM
+                echo `date +%y-%m-%d_%H:%M` "Starting virtual machine..." >> $LOG
+                virsh start {#VM_NAME}
+                [[ $? != 0 ]] && exit 1
+                
+                #log status
+                duration=$SECONDS
+                echo "$(($duration / 60)) minutes and $(($duration % 60)) seconds elapsed." >> $LOG
+                echo "Status = OK" >> $LOG
+                ' &
+              authtype: PUBLIC_KEY
+              username: zabbix
+              publickey: id_rsa.pub
+              privatekey: id_rsa
+              tags:
+                -
+                  tag: Application
+                  value: 'MC IaC Client - VM Replica'
+            -
+              uuid: 8315319d7c4445929e5e587f0194a0cf
+              name: 'Replica of virtual machine {#VM_NAME} - log checksum'
+              key: 'vfs.file.cksum[/var/log/{#VM_NAME}-replica.log]'
+              delay: '0;{$REPLICA_MONITOR}'
+              tags:
+                -
+                  tag: Application
+                  value: 'MC IaC Client - VM Replica'
+            -
+              uuid: 8d554cc91de441dc8b2ab9414fb8db84
+              name: 'Replica of virtual machine {#VM_NAME} - status'
+              key: 'vfs.file.regmatch[/var/log/{#VM_NAME}-replica.log,Status = OK]'
+              delay: '0;{$REPLICA_MONITOR}'
+              tags:
+                -
+                  tag: Application
+                  value: 'MC IaC Client - VM Replica'
+          trigger_prototypes:
+            -
+              uuid: ccd8cf5bbe89465cadec325de281bdcf
+              expression: |
+                change(/MC IaC Client - VM Replica/vfs.file.cksum[/var/log/{#VM_NAME}-replica.log])=0
+                or
+                last(/MC IaC Client - VM Replica/vfs.file.regmatch[/var/log/{#VM_NAME}-replica.log,Status = OK])=0
+              name: 'Replica of virtual machine {#VM_NAME} - fail'
+              priority: HIGH
+              tags:
+                -
+                  tag: Application
+                  value: 'MC IaC Client - VM Replica'
+      macros:
+        -
+          macro: '{$REPLICA_DEST_FOLDER}'
+          value: /var/lib/libvirt/images
+        -
+          macro: '{$REPLICA_DEST_SERVER}'
+          value: '<server_ip>'
+        -
+          macro: '{$REPLICA_MONITOR}'
+          value: wd7h7m0
+          description: 'sunday 7am'
+        -
+          macro: '{$REPLICA_SCHEDULE}'
+          value: wd7h3m0
+          description: 'sunday 3am'
+        -
+          macro: '{$REPLICA_VMS_LIST}'
+          value: '''vm1;vm2'''
+    -
+      uuid: 0c92c2e544704f159464dc452e18b1c4
+      template: 'MC IaC Server'
+      name: 'MC IaC Server'
+      groups:
+        -
+          name: 'Zabbix servers'
+      items:
+        -
+          uuid: 2b1bda8c875d403f8f713d3b5832bbe9
+          name: 'IaC - Zabbix agent ping'
+          key: agent.ping
+          tags:
+            -
+              tag: Application
+              value: 'MC IaC Server'
+          triggers:
+            -
+              uuid: 755eb58782684af999905bc14909eb65
+              expression: 'max(/MC IaC Server/agent.ping,{$AGENT.TIMEOUT})=0'
+              name: 'IaC - Zabbix agent is not available (for {$AGENT.TIMEOUT})'
+              priority: AVERAGE
+        -
+          uuid: c1d59a144290440a8482ed381157f8d9
+          name: 'IaC - Daily refresh'
+          key: iac.daily_refresh
+          delay: 1d
+          trends: '0'
+          value_type: TEXT
+          tags:
+            -
+              tag: Application
+              value: 'MC IaC Server'
+        -
+          uuid: 99e84b7f5cf14e6485633ccfcbe01c88
+          name: 'IaC - RSA Public Key'
+          key: 'vfs.file.contents[/var/lib/mysql/MC/.ssh/id_rsa.pub]'
+          delay: 10m
+          trends: '0'
+          value_type: TEXT
+          preprocessing:
+            -
+              type: DISCARD_UNCHANGED
+              parameters:
+                - ''
+          tags:
+            -
+              tag: Application
+              value: 'MC IaC Server'
+        -
+          uuid: 6b8fc41b78ca4e29b54a6d741968582f
+          name: 'IaC - Check SSH RSA keys'
+          key: 'vfs.file.exists[/var/lib/mysql/MC/.ssh/id_rsa.pub]'
+          delay: 1h
+          tags:
+            -
+              tag: Application
+              value: 'MC IaC Server'
+          triggers:
+            -
+              uuid: cc42e207b85b45db8d4ef62ce6ca6ff7
+              expression: 'last(/MC IaC Server/vfs.file.exists[/var/lib/mysql/MC/.ssh/id_rsa.pub])=0'
+              name: 'IaC - SSH RSA Key doesn''t exist'
+              priority: WARNING
+              dependencies:
+                -
+                  name: 'IaC - Zabbix agent is not available (for {$AGENT.TIMEOUT})'
+                  expression: 'max(/MC IaC Server/agent.ping,{$AGENT.TIMEOUT})=0'
+      macros:
+        -
+          macro: '{$AGENT.TIMEOUT}'
+          value: 3m

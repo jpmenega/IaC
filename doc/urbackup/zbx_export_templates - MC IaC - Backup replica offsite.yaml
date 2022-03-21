@@ -1,6 +1,6 @@
 zabbix_export:
   version: '5.4'
-  date: '2022-02-27T19:41:13Z'
+  date: '2022-03-20T19:31:40Z'
   groups:
     -
       uuid: 3500ba09d0534297840ca620c9dd46bf
@@ -87,7 +87,7 @@ zabbix_export:
                #check if volume is realy a folder
                if [ -d "$source_folder/$volume" ]; then
                  # Get backup list to retrieve the last backup to sync
-                 backupList=( $(ls -lah $source_folder/$volume|awk "{print \\$NF}"|grep -v "^[.]") )
+                 backupList=( $(ls -lah $source_folder/$volume|awk "{print \$NF}"|grep -v "^[.]") )
             
                  #create folder in destiny if not exist
                  ssh $dest mkdir -p $dest_folder/$volume
