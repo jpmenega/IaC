@@ -1,0 +1,17 @@
+https://linuxconfig.org/how-to-force-fsck-to-check-filesystem-after-system-reboot-on-linux
+
+#Verificar Last checked
+tune2fs -l /dev/sdaX | grep Last
+
+#Verificar quantas vezes foi montado desde a ultima checagem
+tune2fs -l /dev/sdaX | grep Mount
+
+#Verificar maximo de vezes que pode montar antes de fazer nova checagem
+tune2fs -l /dev/sdaX | grep Max
+
+#Configurar para chegar a cada montagem (boot do Raspberry)
+tune2fs -c 1 /dev/sda1
+
+#Forçar uma checagem no boot
+touch /forcefsck
+reboot
