@@ -7,6 +7,14 @@
 Floppy example
 #virt-install --virt-type=kvm --name jump-windows --ram 2048 --vcpus=2 --os-variant=win7 --cdrom=/var/lib/libvirt/boot/windows7.iso --disk path=/var/lib/libvirt/boot/virtio-win-drivers-20120712-1.vfd,device=floppy --network=bridge=br0,model=virtio --graphic vnc --disk path=/var/lib/libvirt/images/jump-windows.qcow2,size=20,bus=virtio,format=qcow2 
 
+Windows 7 drivers example:
+# virt-install --virt-type=kvm --name jump-win7 --ram 2048 --vcpus=2 --os-variant=win7 --cdrom=/var/lib/libvirt/boot/win7sp1-ultimate-64bits.iso --disk path=/var/lib/libvirt/boot/virtio-win-0.1.173.iso,device=cdrom --network=bridge=br0,model=virtio --graphic vnc --disk path=/var/lib/libvirt/images/jump-win7.qcow2,size=30,bus=virtio,format=qcow2
+Obs: 
+1) virtio-win-0.1.173 (versão boa pra windows 7)
+2) virtio controller disk path: /viostor/w7/amd64
+3) virtio network driver path: /NetKVM/w7/amd64
+4) PCI Device driver path: /Balloon/w7/amd64
+
 #ssh root@192.168.1.201 -L 5900:127.0.0.1:5900
 
 VNC localhost 5900

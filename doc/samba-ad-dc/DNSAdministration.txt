@@ -1,0 +1,64 @@
+Checklist ---------------------------------------
+- Verificar e deixar apenas 1 IP para entrada DNS de @ e AD (samba-ad-dc01)
+samba-tool dns query 127.0.0.1 <domain> @ ALL -U administrator
+samba-tool dns delete 127.0.0.1 <domain> -U administrator @ A 192.168.1.x
+samba-tool dns delete 127.0.0.1 <domain> -U administrator samba-ad-dc01 A 192.168.1.x
+
+Corrigir smb.conf e reiniciar Samba
+netbios name = SAMBA-AD-DC01
+interfaces = 127.0.0.1 192.168.xx.xx 192.168.xx.yy
+bind interfaces only = yes
+
+- Verificar se já existe uma zona para reverso senao criar
+samba-tool dns zonelist 127.0.0.1 -U administrator
+samba-tool dns zonecreate 127.0.0.1 -UAdministrator xx.168.192.in-addr.arpa
+
+- Verificar reverso criado
+samba-tool dns query 127.0.0.1 xx.168.192.in-addr.arpa @ ALL -U administrator
+
+- Corrigir entradas DNS pendentes
+samba_dnsupdate --verbose
+
+- Apontar primeiro DNS dos clients para o Samba
+--------------------------------------- Checklist 
+
+
+smb.conf remover
+#socket options = TCP_NODELAY SO_RCVBUF=8192 SO_SNDBUF=8192
+#client ntlmv2 auth = yes
+#client lanman auth = yes
+
+smb.conf alterar
+netbios name = SAMBA-AD-DC01
+
+smb.conf incluir
+interfaces = 127.0.0.1 192.168.1.249
+bind interfaces only = yes
+
+
+DNS Administration
+https://wiki.samba.org/index.php/DNS_Administration#Importance_of_DNS_for_Active_Directory
+---
+QUERYS
+samba-tool dns zonelist 127.0.0.1 -U administrator
+samba-tool dns zoneinfo 127.0.0.1 mc.intranet -U administrator
+samba-tool dns query 127.0.0.1 uz.intranet @ ALL -U administrator
+samba-tool dns query 127.0.0.1 1.168.192.in-addr.arpa @ ALL -U administrator
+samba-tool dns query 127.0.0.1 _msdcs.uz.intranet @ ALL -U administrator
+Uz2@21TI
+---
+ADD
+samba-tool dns zonecreate 127.0.0.1 -UAdministrator 1.168.192.in-addr.arpa
+samba-tool dns add 127.0.0.1 uz.intranet -Uadministrator jump-win7 A 192.168.1.115
+---
+DEL
+samba-tool dns zonedelete 127.0.0.1 -UAdministrator 1.168.192.in-addr.arpa
+samba-tool dns delete 127.0.0.1 uz.intranet -U administrator samba-ad-dc01 A 192.168.1.242
+
+
+samba_dnsupdate --verbose
+
+
+
+RSAT
+https://wiki.samba.org/index.php/Installing_RSAThttps://wiki.samba.org/index.php/Installing_RSAT
