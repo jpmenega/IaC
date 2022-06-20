@@ -11,11 +11,8 @@ cd ~/IaC
 nano ~/IaC/hosts-raspberry (alterar IPs)
 
 ansible-playbook -i hosts-raspberry main/initial.yml
-ansible-playbook -i hosts-raspberry lb/loadbalancer.yml
 
 ansible-playbook -i hosts-raspberry raspberry/relayModule.yml
 
-#ansible-playbook -i hosts-raspberry zabbix/zabbix.yml
-#ansible-playbook -i hosts-raspberry samba/samba.yml
-
+ansible-playbook -i hosts-raspberry raspberry/kvm.yml
 

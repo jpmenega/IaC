@@ -1,7 +1,10 @@
 Hypervisor
 
+---------
+(já instalado pelo Ansible)
 apt install sysstat
 apt install qemu-kvm libvirt-clients libvirt-daemon-system bridge-utils virtinst libvirt-daemon virt-manager libosinfo-bin libguestfs-tools -y
+---------
 
 cd /var/lib/libvirt/images
 #wget https://downloads.ipfire.org/releases/ipfire-2.x/2.25-core157/ipfire-2.25.2gb-ext4.aarch64-full-core157.img.xz

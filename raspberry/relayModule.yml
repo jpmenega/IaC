@@ -18,7 +18,7 @@
 
     - name: Download Raspberry relay scripts
       unarchive:
-        src: {{ git_source }}/raspberry/scripts/radio.tar.gz
+        src: "{{ git_source }}/raspberry/scripts/radio.tar.gz"
         dest: /etc/zabbix/scripts
         remote_src: yes
 
@@ -27,7 +27,7 @@
 
     - name: Download radioPowerOn boot service script
       get_url:
-        url: {{ git_source }}/raspberry/config/radioPowerOn.service
+        url: "{{ git_source }}/raspberry/config/radioPowerOn.service"
         dest: /etc/systemd/system/radioPowerOn.service
 
     - name: Reload daemons

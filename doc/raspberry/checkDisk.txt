@@ -1,3 +1,5 @@
+(usava com boot por card que dava muito problema)
+
 https://linuxconfig.org/how-to-force-fsck-to-check-filesystem-after-system-reboot-on-linux
 
 #Verificar Last checked
