@@ -1,8 +1,8 @@
 [active]
-raspberry01 ansible_host=192.168.20.2 ansible_user=root lb_primary=yes device_id=host01 nodePeer=192.168.20.3
+raspberry02 ansible_host=192.168.20.3 ansible_user=root lb_slave=yes device_id=host02 nodePeer=192.168.20.2
 
 [on_hold]
-raspberry02 ansible_host=192.168.20.3 ansible_user=root lb_slave=yes device_id=host02 nodePeer=192.168.20.2
+raspberry01 ansible_host=192.168.20.2 ansible_user=root lb_primary=yes device_id=host01 nodePeer=192.168.20.3
 
 [all:vars]
 ansible_python_interpreter=/usr/bin/python3

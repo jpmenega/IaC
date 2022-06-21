@@ -137,6 +137,11 @@
         name: zabbix-agent.service
         state: restarted
 
+    - name: Enable service zabbix-agent
+      service:
+        name: zabbix-agent.service
+        enabled: yes
+
     - name: install rsync
       apt:
         name: rsync

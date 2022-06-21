@@ -16,3 +16,6 @@ ansible-playbook -i hosts-raspberry raspberry/relayModule.yml
 
 ansible-playbook -i hosts-raspberry raspberry/kvm.yml
 
+=====================
+Aplicar instrucoes abaixo para criar startup das VMs no boot do hypervisor
+/IaC/doc/Linux/startupScript.txt

@@ -1,0 +1,20 @@
+Verifiquei que os modulos r8152 e cdc_ether nao foram carregados
+lsmod 
+modprobe r8152
+modprobe cdc_ether
+
+Percebi que carregando os modulos a eth nao subia, fiz um reset e percebi que o idProduct mudou de 0600 para 06001 e a eth subiu
+
+usbreset (pra mostrar a lista de devices e o ID)
+usbreset 2357:0601
+
+reconfigurei o config.boot para um delay de 5 segundos e passou a carregar corregamente o idProduct 0601 já no boot
+
+/boot/firmware/config.boot:
+[pi4]
+#kernel=uboot_rpi_4.bin
+max_framebuffers=2
+dtoverlay=vc4-fkms-v3d
+boot_delay=5
+kernel=vmlinuz
+initramfs initrd.img followkernel
